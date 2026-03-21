@@ -160,6 +160,9 @@ def compute_image_sources(
                 if nx == 0 and ny == 0 and nz == 0:
                     continue
 
+                if abs(nx) + abs(ny) + abs(nz) > ism_order:
+                    continue
+
                 iz = _reflect_coord(nz, src_pos[2], W)
 
                 img_pos = np.array([ix, iy, iz], dtype=np.float64)
