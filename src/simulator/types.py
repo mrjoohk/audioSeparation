@@ -123,6 +123,8 @@ class ObjectSpec:
     object_type: str            # e.g. "chair", "table", "partition"
     size: np.ndarray            # float[3], bounding box dimensions (m)
     acoustic_role: AcousticRole = "reflective"
+    position: Optional[np.ndarray] = None   # If set, bypass rejection sampling
+    rotation_y: float = 0.0                 # Rotation around Y axis (rad)
 
 
 @dataclass

@@ -35,9 +35,13 @@ _MAX_PLACEMENT_ATTEMPTS: int = 100
 
 # Default acoustic role mapping by object type
 _DEFAULT_ROLE_MAP: Dict[str, AcousticRole] = {
-    "partition": "occluding",
-    "chair":     "absorptive",
-    "table":     "reflective",
+    "partition":   "occluding",
+    "chair":       "absorptive",
+    "table":       "reflective",
+    "tv":          "reflective",
+    "monitor":     "reflective",
+    "whiteboard":  "reflective",
+    "laptop":      "reflective",
 }
 
 
@@ -77,6 +81,20 @@ def place_obstacle_objects(
     layout: ObstacleLayout = []
 
     for idx, spec in enumerate(object_specs):
+        # --- Explicit position: bypass rejection sampling ---
+        if spec.position is not None:
+            obj = PlacedObject(
+                object_id=f"{spec.object_type}_{idx}",
+                object_type=spec.object_type,
+                position=np.asarray(spec.position, dtype=np.float64),
+                size=np.asarray(spec.size, dtype=np.float64),
+                rotation_y=float(spec.rotation_y),
+                acoustic_role=spec.acoustic_role,
+            )
+            layout.append(obj)
+            continue
+
+        # --- Rejection sampling for objects without explicit position ---
         half = np.asarray(spec.size, dtype=np.float64) / 2.0
 
         # Compute valid position range (object centre must be this far from walls)

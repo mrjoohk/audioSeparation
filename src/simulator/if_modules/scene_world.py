@@ -102,14 +102,16 @@ class SceneWorldBuilder:
         from simulator.types import ObjectSpec
         import numpy as np
 
-        specs = [
-            ObjectSpec(
+        specs = []
+        for o in obstacle_cfg:
+            pos_raw = o.get("position")
+            specs.append(ObjectSpec(
                 object_type=o.get("type", "table"),
                 size=np.array(o.get("size", [0.8, 0.75, 0.8]), dtype=np.float64),
                 acoustic_role=o.get("acoustic_role", "reflective"),
-            )
-            for o in obstacle_cfg
-        ]
+                position=np.array(pos_raw, dtype=np.float64) if pos_raw is not None else None,
+                rotation_y=float(o.get("rotation_y", 0.0)),
+            ))
 
         subseed = (self.seed * 31 + 2) & 0x7FFFFFFF
         layout = place_obstacle_objects(self._bbox, specs, subseed)

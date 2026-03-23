@@ -32,6 +32,12 @@ import plotly.graph_objects as go
 from simulator.if_modules.orchestration import simulate_scene
 from simulator.types import SceneConfig
 from simulator.uf.w151_config import SceneConfigValidator, ValidationError
+from simulator.scenarios.zoom_meeting import (
+    generate_zoom_scenario,
+    generate_zoom_scenarios,
+    save_scenarios,
+    load_scenario_from_file,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -721,6 +727,232 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
                 fn=import_config,
                 inputs=[config_upload],
                 outputs=_import_outputs,
+            )
+
+        # =====================================================================
+        # TAB 5 — Zoom Scenario Generator
+        # =====================================================================
+        with gr.Tab("🎯 Zoom Scenario"):
+            gr.Markdown("### Zoom Meeting Scenario Generator")
+            gr.Markdown(
+                "Physically-based conference room layout generator for Zoom-style video meetings. "
+                "Participants are placed at a conference table facing each other, with a TV and "
+                "conference mic on the camera wall."
+            )
+            with gr.Row():
+                # ---- Left panel: parameters --------------------------------
+                with gr.Column(scale=1):
+                    gr.Markdown("#### Meeting Setup")
+                    zoom_n_participants = gr.Slider(2, 12, value=4, step=1, label="Participants")
+                    with gr.Row():
+                        zoom_room_size = gr.Dropdown(
+                            ["auto", "small", "medium", "large"], value="auto", label="Room Size"
+                        )
+                        zoom_material = gr.Dropdown(MATERIAL_PRESETS, value="concrete", label="Wall Material")
+                    with gr.Row():
+                        zoom_has_tv = gr.Checkbox(value=True, label="Include TV (reflective)")
+                        zoom_tv_as_source = gr.Checkbox(value=False, label="TV as sound source")
+                    with gr.Row():
+                        zoom_ism_order = gr.Slider(1, 6, value=3, step=1, label="ISM Order")
+                        zoom_sample_rate = gr.Dropdown(
+                            [str(r) for r in VALID_SAMPLE_RATES], value="16000", label="Sample Rate"
+                        )
+                    with gr.Row():
+                        zoom_seed = gr.Number(label="Seed", value=42, precision=0)
+                        zoom_n_scenarios = gr.Slider(1, 1000, value=10, step=1, label="# Scenarios to Generate")
+                    zoom_output_dir = gr.Textbox(label="Output Directory", value="output/scenarios")
+
+                    with gr.Row():
+                        zoom_preview_btn = gr.Button("🎲 Preview", variant="secondary")
+                        zoom_generate_btn = gr.Button("📁 Generate & Save N", variant="primary")
+
+                # ---- Right panel: preview ----------------------------------
+                with gr.Column(scale=1):
+                    zoom_plot = gr.Plot(label="Room Preview")
+                    zoom_json_preview = gr.Code(label="Scenario JSON Preview", language="json")
+
+            zoom_file_list = gr.Dataframe(
+                headers=["File Path", "Participants", "Room", "Sources"],
+                label="Generated Scenario Files",
+                interactive=False,
+            )
+            zoom_status = gr.Textbox(label="Status", interactive=False)
+
+            # ---- Helpers ---------------------------------------------------
+            def _zoom_plot_from_cfg(cfg: dict) -> go.Figure:
+                dims = cfg["room"]["dimensions"]
+                L, W, H = dims["L"], dims["W"], dims["H"]
+                sources_xyz = [s["position"] for s in cfg["sources"]]
+                receivers_xyz = [r["position"] for r in cfg["receivers"]]
+
+                fig = make_room_plot(
+                    L, W, H,
+                    [tuple(p) for p in sources_xyz],
+                    [tuple(p) for p in receivers_xyz],
+                )
+
+                # Draw table as semi-transparent box
+                for obs in cfg["room"].get("obstacles", []):
+                    if obs["type"] == "table":
+                        cx, cy, cz = obs["position"]
+                        sl, sh, sw = obs["size"]
+                        x0, x1 = cx - sl/2, cx + sl/2
+                        y0, y1 = 0.0, cy + sh/2
+                        z0, z1 = cz - sw/2, cz + sw/2
+                        # 8 corners of the table box
+                        vx = [x0,x1,x1,x0, x0,x1,x1,x0]
+                        vy = [y0,y0,y0,y0, y1,y1,y1,y1]
+                        vz = [z0,z0,z1,z1, z0,z0,z1,z1]
+                        fig.add_trace(go.Mesh3d(
+                            x=vx, y=vy, z=vz,
+                            i=[0,0,0,4,4,4], j=[1,2,3,5,6,7], k=[2,3,1,6,7,5],
+                            opacity=0.25, color="burlywood", name="Table", showlegend=True,
+                        ))
+                    elif obs["type"] == "tv":
+                        cx, cy, cz = obs["position"]
+                        sd, sh, sw = obs["size"]
+                        # TV as a dark rectangle on X=0 wall
+                        fig.add_trace(go.Scatter3d(
+                            x=[cx, cx, cx, cx, cx],
+                            y=[cy-sh/2, cy+sh/2, cy+sh/2, cy-sh/2, cy-sh/2],
+                            z=[cz-sw/2, cz-sw/2, cz+sw/2, cz+sw/2, cz-sw/2],
+                            mode="lines",
+                            line=dict(color="black", width=4),
+                            name="TV",
+                        ))
+                return fig
+
+            def zoom_preview(n_participants, room_size, material, has_tv, tv_as_source,
+                             ism_order, sample_rate, seed):
+                cfg = generate_zoom_scenario(
+                    n_participants=int(n_participants), seed=int(seed),
+                    room_size=room_size, material=material,
+                    has_tv=has_tv, tv_as_source=tv_as_source,
+                    sample_rate=int(sample_rate), ism_order=int(ism_order),
+                )
+                fig = _zoom_plot_from_cfg(cfg)
+                preview_json = json.dumps(cfg, indent=2)
+                return fig, preview_json
+
+            def zoom_generate_save(n_participants, room_size, material, has_tv, tv_as_source,
+                                   ism_order, sample_rate, seed, n_scenarios, output_dir):
+                cfgs = generate_zoom_scenarios(
+                    n_scenarios=int(n_scenarios),
+                    min_participants=max(2, int(n_participants) - 2),
+                    max_participants=min(12, int(n_participants) + 2),
+                    seed_base=int(seed),
+                    output_dir=output_dir,
+                    room_size=room_size, material=material,
+                    has_tv=has_tv, tv_as_source=tv_as_source,
+                    sample_rate=int(sample_rate), ism_order=int(ism_order),
+                )
+                paths = save_scenarios(cfgs, output_dir)
+                rows = []
+                for cfg, path in zip(cfgs, paths):
+                    dims = cfg["room"]["dimensions"]
+                    room_str = f"{dims['L']}x{dims['W']}x{dims['H']}"
+                    rows.append([path, cfg["_zoom_meta"]["n_participants"], room_str, len(cfg["sources"])])
+                status = f"✅ {len(paths)} scenario(s) saved to {output_dir}"
+                # Also show preview of first scenario
+                fig = _zoom_plot_from_cfg(cfgs[0])
+                preview_json = json.dumps(cfgs[0], indent=2)
+                return rows, status, fig, preview_json
+
+            _zoom_param_inputs = [
+                zoom_n_participants, zoom_room_size, zoom_material,
+                zoom_has_tv, zoom_tv_as_source,
+                zoom_ism_order, zoom_sample_rate, zoom_seed,
+            ]
+
+            zoom_preview_btn.click(
+                fn=zoom_preview,
+                inputs=_zoom_param_inputs,
+                outputs=[zoom_plot, zoom_json_preview],
+            )
+            zoom_generate_btn.click(
+                fn=zoom_generate_save,
+                inputs=_zoom_param_inputs + [zoom_n_scenarios, zoom_output_dir],
+                outputs=[zoom_file_list, zoom_status, zoom_plot, zoom_json_preview],
+            )
+            # Live preview on parameter change
+            for inp in _zoom_param_inputs:
+                inp.change(fn=zoom_preview, inputs=_zoom_param_inputs,
+                           outputs=[zoom_plot, zoom_json_preview])
+            demo.load(fn=zoom_preview, inputs=_zoom_param_inputs,
+                      outputs=[zoom_plot, zoom_json_preview])
+
+        # =====================================================================
+        # TAB 6 — Run from Files
+        # =====================================================================
+        with gr.Tab("▶ Run from Files"):
+            gr.Markdown("### Simulate from Scenario JSON Files")
+            gr.Markdown(
+                "Select one or more scenario JSON files (generated in **Zoom Scenario** tab or manually created) "
+                "and run batch simulation. Each file → one simulated scene."
+            )
+            with gr.Row():
+                with gr.Column(scale=1):
+                    run_files_upload = gr.File(
+                        label="Select Scenario JSON Files",
+                        file_count="multiple",
+                        file_types=[".json"],
+                    )
+                    with gr.Row():
+                        run_files_output_dir = gr.Textbox(label="Output Directory", value="output/results")
+                        run_files_workers = gr.Slider(1, 8, value=2, step=1, label="Workers")
+                    run_files_btn = gr.Button("▶ Simulate Selected Files", variant="primary")
+
+                with gr.Column(scale=1):
+                    run_files_status = gr.Textbox(label="Status", interactive=False)
+                    run_files_table = gr.Dataframe(
+                        headers=["Scene ID", "Status", "Elapsed", "RT60 (s)"],
+                        label="Progress",
+                        interactive=False,
+                    )
+
+            def simulate_from_files(file_list, output_dir, n_workers, progress=gr.Progress(track_tqdm=True)):
+                if not file_list:
+                    yield [], "No files selected."
+                    return
+
+                configs = []
+                errors = []
+                for f in file_list:
+                    try:
+                        raw = load_scenario_from_file(f.name)
+                        raw["output_dir"] = output_dir
+                        # Remove internal metadata key before validation
+                        raw.pop("_zoom_meta", None)
+                        cfg = SceneConfigValidator().validate(raw)
+                        configs.append(cfg)
+                    except Exception as e:
+                        errors.append(f"Load error {os.path.basename(f.name)}: {e}")
+
+                if not configs:
+                    yield [], "\n".join(errors) or "No valid configs."
+                    return
+
+                rows = []
+                for cfg in progress.tqdm(configs, desc="Simulating scenes"):
+                    t0 = time.perf_counter()
+                    try:
+                        result = simulate_scene(cfg)
+                        elapsed = time.perf_counter() - t0
+                        summary = result.get("acoustic_summary")
+                        rt60 = f"{summary.rt60_measured_s:.3f}" if summary else "-"
+                        rows.append([cfg.scene_id, "✅ done", f"{elapsed:.2f}s", rt60])
+                    except Exception as e:
+                        elapsed = time.perf_counter() - t0
+                        rows.append([cfg.scene_id, f"❌ {str(e)[:40]}", f"{elapsed:.2f}s", "-"])
+                    yield rows, f"Progress: {len(rows)}/{len(configs)}"
+
+                error_msg = ("\n" + "\n".join(errors)) if errors else ""
+                yield rows, f"✅ Done — {len(configs)} scene(s) → {output_dir}{error_msg}"
+
+            run_files_btn.click(
+                fn=simulate_from_files,
+                inputs=[run_files_upload, run_files_output_dir, run_files_workers],
+                outputs=[run_files_table, run_files_status],
             )
 
 
