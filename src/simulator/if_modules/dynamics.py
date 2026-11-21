@@ -14,6 +14,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from simulator.types import (
+    DEFAULT_DURATION_S, DEFAULT_TICK_RATE_HZ,
     AABB, MaterialMap, ObstacleLayout, RoomGeometry,
     SceneConfig, SceneState, SourceTrajectory, ReceiverTrajectory,
 )
@@ -24,6 +25,25 @@ from simulator.uf.w133_sync import (
 )
 from simulator.uf.w134_dynamic_render import render_dynamic_scene
 from simulator.uf.w151_config import derive_subsystem_seeds
+
+
+
+def _motion_kwargs(entity_cfg: dict) -> Tuple[str, dict]:
+    """Return (motion_type, kwargs) for a source/receiver config.
+
+    A top-level ``position`` is injected into static-type motions that do not
+    carry their own position, so configured positions are actually rendered
+    (previously they were ignored and a random position was drawn).
+    """
+    motion = dict(entity_cfg.get("motion") or {"type": "static"})
+    motion_type = motion.pop("type", "static")
+    if motion_type in ("static", "array_mounted") and motion.get("position") is None:
+        pos = entity_cfg.get("position")
+        if isinstance(pos, dict):
+            pos = [pos.get("x"), pos.get("y"), pos.get("z")]
+        if pos is not None:
+            motion["position"] = np.asarray(pos, dtype=np.float64)
+    return motion_type, motion
 
 
 class DynamicSceneOrchestrator:
@@ -56,23 +76,22 @@ class DynamicSceneOrchestrator:
             (src_trajectories, rec_trajectories)
         """
         motion_cfg = self.config.motion or {}
-        tick_rate = float(motion_cfg.get("tick_rate_hz", 50.0))
+        tick_rate = float(motion_cfg.get("tick_rate_hz", DEFAULT_TICK_RATE_HZ))
 
-        # Compute duration from motion config or default 10 s
-        duration_s = float(motion_cfg.get("duration_s", 10.0))
+        # Scene duration: motion.duration_s or the shared DEFAULT_DURATION_S
+        duration_s = float(motion_cfg.get("duration_s", DEFAULT_DURATION_S))
 
         src_seed_base = self._seeds["trajectory_src"]
         src_trajectories: List[SourceTrajectory] = []
         for i, src_cfg in enumerate(self.config.sources):
-            motion = src_cfg.get("motion", {"type": "static"})
-            motion_type = motion.get("type", "static")
-            kwargs = {k: v for k, v in motion.items() if k != "type"}
+            motion_type, kwargs = _motion_kwargs(src_cfg)
             traj = generate_source_trajectory(
                 motion_type=motion_type,
                 room_bbox=self.room_bbox,
                 duration_s=duration_s,
                 tick_rate_hz=tick_rate,
                 seed=(src_seed_base + i) & 0x7FFFFFFF,
+                source_id=src_cfg["source_id"],
                 **kwargs,
             )
             src_trajectories.append(traj)
@@ -80,15 +99,14 @@ class DynamicSceneOrchestrator:
         rec_seed_base = self._seeds["trajectory_rec"]
         rec_trajectories: List[ReceiverTrajectory] = []
         for i, rec_cfg in enumerate(self.config.receivers):
-            motion = rec_cfg.get("motion", {"type": "static"})
-            receiver_type = motion.get("type", "static")
-            kwargs = {k: v for k, v in motion.items() if k != "type"}
+            receiver_type, kwargs = _motion_kwargs(rec_cfg)
             traj = generate_receiver_trajectory(
                 receiver_type=receiver_type,
                 room_bbox=self.room_bbox,
                 duration_s=duration_s,
                 tick_rate_hz=tick_rate,
                 seed=(rec_seed_base + i) & 0x7FFFFFFF,
+                receiver_id=rec_cfg["receiver_id"],
                 **kwargs,
             )
             rec_trajectories.append(traj)
@@ -120,13 +138,14 @@ class DynamicSceneOrchestrator:
             List[SceneState], one per tick.
         """
         motion_cfg = self.config.motion or {}
-        tick_rate = float(motion_cfg.get("tick_rate_hz", 50.0))
+        tick_rate = float(motion_cfg.get("tick_rate_hz", DEFAULT_TICK_RATE_HZ))
         return synchronize_scene_ticks(
             src_trajectories=src_trajectories,
             rec_trajectories=rec_trajectories,
             room=room,
             obstacles=obstacles,
             tick_rate_hz=tick_rate,
+            materials=material_map,
         )
 
     # ------------------------------------------------------------------
@@ -148,7 +167,7 @@ class DynamicSceneOrchestrator:
             {source_id: {active_ticks, start_tick, end_tick}}
         """
         motion_cfg = self.config.motion or {}
-        tick_rate = float(motion_cfg.get("tick_rate_hz", 50.0))
+        tick_rate = float(motion_cfg.get("tick_rate_hz", DEFAULT_TICK_RATE_HZ))
 
         if not src_trajectories:
             return {}

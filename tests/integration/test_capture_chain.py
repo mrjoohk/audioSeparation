@@ -134,3 +134,34 @@ def test_chain_with_bandwidth_impairment():
     attenuation_db = 10 * np.log10((energy_in + 1e-30) / (energy_out + 1e-30))
     assert attenuation_db > 20.0, \
         f"6 kHz attenuation only {attenuation_db:.1f} dB (expected > 20 dB)"
+
+
+def test_per_channel_gain_applied():
+    """Audit F-09: receivers[1].gain_db must affect channel 1 (only receivers[0] was read)."""
+    cfg = SceneConfig(
+        scene_id="gain", seed=3, schema_version="1.0.0",
+        room={"type": "shoebox", "dimensions": {"L": 5.0, "W": 4.0, "H": 3.0}},
+        materials={}, sources=[{"source_id": "s0", "position": [1, 1, 1]}],
+        receivers=[
+            {"receiver_id": "r0", "position": [2, 1, 2]},
+            {"receiver_id": "r1", "position": [3, 1, 2], "gain_db": 12.0},
+        ],
+        sample_rate=16000,
+    )
+    rng = np.random.default_rng(0)
+    x = (0.05 * rng.standard_normal(16000)).astype(np.float32)
+    sig = np.stack([x, x])
+    out, meta = apply_device_chain(sig, cfg, make_mic_specs(2))
+    ratio_db = 20 * np.log10(np.std(out[1]) / np.std(out[0]))
+    assert ratio_db == pytest.approx(12.0, abs=0.2)
+    assert len(meta["clipped_samples"]) == 2
+
+
+def test_noise_component_exposed():
+    cfg = make_config()
+    chain = CaptureDeviceChain(cfg, seed=cfg.seed)
+    C = len(cfg.receivers)
+    sig = np.zeros((C, 8000), dtype=np.float32)
+    out, _ = chain.process_full_chain(sig, make_mic_specs(C))
+    # Silent input: the observed signal is exactly the exposed noise (no clipping/codec).
+    np.testing.assert_allclose(out, chain.last_noise_component, atol=1e-7)

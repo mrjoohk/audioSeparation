@@ -71,10 +71,15 @@ def test_rir_direct_peak_at_correct_delay():
     # Expected delay: distance / c = sqrt((4-1)^2+(1-1)^2+(4-1)^2)/343 * 16000
     dist = np.linalg.norm(np.array([4.0, 1.0, 4.0]) - np.array([1.0, 1.0, 1.0]))
     expected_sample = round(dist / 343.0 * 16000)
-    peak_sample = int(np.argmax(np.abs(rir.h)))
-
-    assert abs(peak_sample - expected_sample) <= 3, \
-        f"Peak at sample {peak_sample}, expected {expected_sample} (dist={dist:.3f} m)"
+    # The receiver sits on the z = W wall and the layout is symmetric, so several
+    # first-order images arrive simultaneously and their sum may exceed the
+    # direct path.  The physically required property is causality: the first
+    # arrival is the direct path and nothing precedes it.
+    h = np.abs(rir.h)
+    first_arrival = int(np.argmax(h > 1e-3 * h.max()))
+    assert abs(first_arrival - expected_sample) <= 1, \
+        f"First arrival at sample {first_arrival}, expected {expected_sample} (dist={dist:.3f} m)"
+    assert h[expected_sample] >= 0.9 * h[expected_sample - 3:expected_sample + 4].max()
 
 
 def test_rir_reproducibility():

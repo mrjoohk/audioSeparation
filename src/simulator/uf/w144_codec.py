@@ -155,9 +155,14 @@ def apply_packet_loss(
     packet_error_rate: float = 0.05,
     segment_duration_ms: float = 20.0,
     seed: int = 42,
+    allow_stress: bool = False,
 ) -> tuple:
     """
     Simulate packet loss by zeroing randomly selected segments.
+
+    ``packet_error_rate`` must lie in the requirement range [0, 0.2]
+    (REQ: "configurable PER 0–20%"); values outside raise ValueError.
+    Deliberate stress conditions may pass ``allow_stress=True`` to accept [0, 1].
 
     Each segment has duration = segment_duration_ms ms = segment_duration_ms * fs / 1000 samples.
     Each segment is dropped independently with probability = packet_error_rate.
@@ -180,14 +185,14 @@ def apply_packet_loss(
     N = len(signal)
 
     # Validate PER
-    if packet_error_rate < PER_MIN or packet_error_rate > PER_MAX:
-        warnings.warn(
+    per_max = 1.0 if allow_stress else PER_MAX
+    if not (PER_MIN <= packet_error_rate <= per_max):
+        raise ValueError(
             f"apply_packet_loss: packet_error_rate={packet_error_rate:.4f} outside "
-            f"valid range [{PER_MIN}, {PER_MAX}]. Clamping.",
-            UserWarning,
-            stacklevel=2,
+            f"valid range [{PER_MIN}, {per_max}]"
+            + ("" if allow_stress else " (pass allow_stress=True for stress conditions)")
+            + "."
         )
-        packet_error_rate = float(np.clip(packet_error_rate, PER_MIN, PER_MAX))
 
     segment_samples = int(round(segment_duration_ms * fs / 1000.0))
     if segment_samples < 1:

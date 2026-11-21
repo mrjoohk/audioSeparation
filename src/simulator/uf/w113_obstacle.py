@@ -101,7 +101,20 @@ def place_obstacle_objects(
         lo = room_bbox.min_corner + _WALL_CLEARANCE_M + half
         hi = room_bbox.max_corner - _WALL_CLEARANCE_M - half
 
-        if np.any(lo >= hi):
+        # Vertical axis (Y-up): an object too tall for floor/ceiling clearance
+        # (e.g. a pillar or partition) stands on the floor instead of being
+        # dropped, provided it is no taller than the room.
+        room_h = float(room_bbox.max_corner[1] - room_bbox.min_corner[1])
+        if lo[1] > hi[1] and 2.0 * half[1] <= room_h + 1e-9:
+            lo[1] = hi[1] = room_bbox.min_corner[1] + half[1]
+            warnings.warn(
+                f"Object '{spec.object_type}' (index {idx}) is too tall for "
+                f"{_WALL_CLEARANCE_M} m vertical clearance; placing it on the floor.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if np.any(lo[[0, 2]] >= hi[[0, 2]]) or lo[1] > hi[1]:
             warnings.warn(
                 f"Object '{spec.object_type}' (index {idx}) cannot fit in the room "
                 f"with {_WALL_CLEARANCE_M} m wall clearance; skipping.",

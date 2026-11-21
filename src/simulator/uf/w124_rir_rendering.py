@@ -56,38 +56,36 @@ def generate_static_rir(
     fs: int,
     rir_duration_s: Optional[float] = None,
     c: float = SPEED_OF_SOUND,
+    mic_pos: Optional[np.ndarray] = None,
 ) -> RIR:
     """Build a full RIR from direct path, image sources, and late reverb tail.
 
     Algorithm
     ---------
-    1.  Determine RIR length:
-        min(max(3 * RT60_estimate, 0.5) * fs,  MAX_RIR_DURATION_S * fs)
-    2.  Place direct-path Dirac at delay_samples with amplitude:
-            direct_path.attenuation_linear * 10^(-occlusion.loss_db / 20)
-    3.  Place each image source Dirac at:
-            delay = round(||img.position - mic_pos|| / c * fs)
-            amplitude = img.path_gain   (already includes 1/r)
-    4.  Generate and add late reverb tail starting at mixing_time.
-    5.  Compute rt60_measured via Schroeder backward integration (fit_rt60).
-    6.  Compute DRR (direct-to-reverberant ratio):
-            DRR = 10 * log10(E_direct / E_reverb)
+    1.  RIR length = min(max(3 * RT60_estimate, 0.5) * fs, MAX_RIR_DURATION_S * fs)
+    2.  Direct-path Dirac at ``delay_samples`` with amplitude
+        ``attenuation_linear * 10^(-occlusion.loss_db / 20)``.
+    3.  Each image source Dirac at ``round(||img.position - mic_pos|| / c * fs)``
+        with amplitude ``img.path_gain`` (already includes 1/r).
+    4.  Late reverb tail starting at the mixing time.  The tail envelope is
+        anchored so that it would have started at ``0.1 * direct amplitude`` at
+        t = 0 and decayed as exp(-6.9 t / RT60); at the mixing time it therefore
+        continues from ``0.1 * A_direct * exp(-6.9 t_mix / RT60)``.  (The former
+        "scale the whole tail RMS to 0.1 * A_direct" rule made the tail onset
+        larger than the direct path for short RT60 / late mixing times and
+        produced NaN when the tail was empty.)
+    5.  RT60 via Schroeder backward integration, DRR from the direct window.
 
     Parameters
     ----------
-    direct_path      : DirectPath
-    reflection_data  : ReflectionData
-    occlusion_result : OcclusionResult
-    fs               : int   sample rate (Hz)
-    rir_duration_s   : float or None  override RIR length (s)
-    c                : float  speed of sound (m/s)
-
-    Returns
-    -------
-    RIR
+    mic_pos : array_like (3,) or None
+        Microphone world position.  Required for geometrically correct
+        image-source delays.  ``None`` keeps the legacy behaviour of measuring
+        image-source distances from the world origin and emits a warning when
+        image sources are present.
     """
-    rt60_estimate = reflection_data.late_tail_spec.rt60_s
-    mixing_time_ms = reflection_data.late_tail_spec.mixing_time_ms
+    rt60_estimate = float(reflection_data.late_tail_spec.rt60_s)
+    mixing_time_ms = float(reflection_data.late_tail_spec.mixing_time_ms)
     seed = reflection_data.late_tail_spec.seed
 
     if rir_duration_s is not None:
@@ -95,119 +93,73 @@ def generate_static_rir(
     else:
         raw_dur = max(3.0 * rt60_estimate, _MIN_RIR_DURATION_S)
         n_samples = int(min(raw_dur * fs, MAX_RIR_DURATION_S * fs))
-
     n_samples = max(n_samples, 1)
     h = np.zeros(n_samples, dtype=np.float64)
 
     # --- Direct path ---
-    delay_s = direct_path.delay_samples
-    occ_gain = 10.0 ** (-occlusion_result.loss_db / 20.0)
-    direct_amplitude = direct_path.attenuation_linear * occ_gain
-
+    occ_gain = 10.0 ** (-float(occlusion_result.loss_db) / 20.0)
+    direct_amplitude = float(direct_path.attenuation_linear) * occ_gain
     direct_idx = int(direct_path.delay_samples)
     if 0 <= direct_idx < n_samples:
         h[direct_idx] += direct_amplitude
 
     # --- Image sources ---
-    # We need mic_pos to compute image-source distances.
-    # It is not directly stored in DirectPath but we can infer the delay already
-    # came from the image source distances.  For image sources, path_gain already
-    # incorporates 1/r; we only need to compute the travel delay.
-    #
-    # We approximate mic_pos = (0,0,0) unless we reconstruct it from src_pos.
-    # Because the caller provides ImageSource.position in world frame and
-    # the distance to mic was used during ISM computation, we recompute:
-    #
-    # NOTE: Since DirectPath carries distance_m and delay_s, we can infer
-    # mic_pos only if we also have src_pos.  The types do not carry these.
-    # The specification says "delay = round(||img.position - mic_pos|| / c * fs)".
-    # We store the *direct* attenuation at ref=1 m, so we cannot re-derive mic_pos.
-    #
-    # Resolution: compute arrival time from path_gain ≈ 1/dist already baked in;
-    # we additionally need the distance for the delay.  We recover distance from
-    # the travel time embedded in path_gain.  However path_gain = refl_coeff / dist,
-    # so dist is not directly recoverable without knowing refl_coeff.
-    #
-    # PRACTICAL APPROACH: store mic_pos in ReflectionData is not part of the spec.
-    # The best-effort approach is to use the ImageSource.position relative to the
-    # inferred mic position.  We derive mic_pos from the direct_path delay:
-    #   dist_direct = direct_path.delay_s * c
-    #   (src direction unknown without src_pos)
-    #
-    # Instead, since image sources are defined relative to the room (not mic),
-    # we accept that mic_pos must be passed.  Per the spec: "delay = round(
-    # ||img.position - mic_pos|| / c * fs)".  We use the convention that
-    # mic_pos is embedded as the zero vector if we cannot recover it.
-    # The caller is expected to ensure image source positions are consistent
-    # with the mic position used during ISM.  We compute delays from the
-    # direct-path information:
-    #
-    # We DO have direct_path.distance_m and we can compute approximate
-    # mic position only if we also have src position.  Since neither is
-    # available we compute image-source delays geometrically if the
-    # ReflectionData carries a mic_pos attribute; otherwise we fall back
-    # to estimating the delay from path_gain (heuristic).
-    #
-    # To keep the API clean and within specification, we iterate image sources
-    # and compute the delay from the distance that was used when creating them.
-    # The ImageSource.path_gain = refl_gain / distance, so we cannot invert it.
-    #
-    # FINAL DECISION: The specification states only that the image sources carry
-    # position (world frame).  We require the mic_pos to place them correctly.
-    # We expose mic_pos as a keyword argument with a default of None which
-    # causes a fallback to distance-from-origin.  This matches what the
-    # ISM module would pass.
+    if mic_pos is None:
+        if reflection_data.image_sources:
+            warnings.warn(
+                "generate_static_rir: mic_pos not given; image-source delays are "
+                "measured from the world origin.",
+                UserWarning,
+                stacklevel=2,
+            )
+        mic = np.zeros(3, dtype=np.float64)
+    else:
+        mic = np.asarray(mic_pos, dtype=np.float64)
 
     for img in reflection_data.image_sources:
         img_pos = np.asarray(img.position, dtype=np.float64)
-        # If mic_pos is embedded in the direct_path (not in spec), we cannot
-        # recover it; use origin as fallback.  This is handled by the caller
-        # using the overload below.
-        dist_img = float(np.linalg.norm(img_pos))
+        dist_img = float(np.linalg.norm(img_pos - mic))
         delay_samples_img = int(round(dist_img / c * fs))
         if 0 <= delay_samples_img < n_samples:
             h[delay_samples_img] += float(img.path_gain)
 
-    # --- Late reverb tail ---
+    # --- Late reverb tail (energy-continuous at the mixing time) ---
     mixing_onset_sample = int(round(mixing_time_ms * 1e-3 * fs))
-    tail = generate_late_reverb_tail(
-        rt60_s=rt60_estimate,
-        mixing_time_ms=mixing_time_ms,
-        fs=fs,
-        n_samples=n_samples,
-        seed=seed,
-    ).astype(np.float64)
+    if rt60_estimate > 0.0 and mixing_onset_sample < n_samples:
+        tail = generate_late_reverb_tail(
+            rt60_s=rt60_estimate,
+            mixing_time_ms=mixing_time_ms,
+            fs=fs,
+            n_samples=n_samples,
+            seed=seed,
+        ).astype(np.float64)
+        t_mix_s = mixing_onset_sample / float(fs)
+        tail_onset_amp = 0.1 * direct_amplitude * math.exp(-6.9 * t_mix_s / rt60_estimate)
+        h += tail * tail_onset_amp
 
-    # Scale tail so its RMS is commensurate with the first image source amplitude
-    tail_rms = float(np.sqrt(np.mean(tail[mixing_onset_sample:] ** 2) + 1e-30))
-    # Target: tail starts at ~direct amplitude / 10 (approximate)
-    tail_target_rms = max(direct_amplitude * 0.1, 1e-9)
-    tail_scaled = tail * (tail_target_rms / tail_rms)
-
-    # Mix tail into h
-    tail_len = min(len(tail_scaled), n_samples)
-    h[:tail_len] += tail_scaled[:tail_len]
-
+    if not np.all(np.isfinite(h)):
+        raise ValueError(
+            f"generate_static_rir: non-finite RIR for pair "
+            f"({direct_path.source_id}, {direct_path.receiver_id})."
+        )
     h_f32 = h.astype(np.float32)
 
     # --- RT60 measurement ---
     try:
         rt60_result = fit_rt60(h_f32, fs=fs, target_rt60=None)
         rt60_measured = float(rt60_result["rt60_measured_s"])
+        if not math.isfinite(rt60_measured):
+            rt60_measured = rt60_estimate
     except Exception:
         rt60_measured = rt60_estimate
 
-    # --- DRR computation ---
-    # Direct energy: sample at direct_idx ± 1
+    # --- DRR ---
     direct_window_start = max(0, direct_idx - 1)
-    direct_window_end   = min(n_samples, direct_idx + 2)
+    direct_window_end = min(n_samples, direct_idx + 2)
     e_direct = float(np.sum(h[direct_window_start:direct_window_end] ** 2))
-
-    # Reverb energy: everything outside direct window
-    e_reverb_before = float(np.sum(h[:direct_window_start] ** 2))
-    e_reverb_after  = float(np.sum(h[direct_window_end:] ** 2))
-    e_reverb = e_reverb_before + e_reverb_after
-
+    e_reverb = float(np.sum(h[:direct_window_start] ** 2)) + float(
+        np.sum(h[direct_window_end:] ** 2)
+    )
     if e_direct < 1e-30:
         drr_db = -60.0
     elif e_reverb < 1e-30:
@@ -237,91 +189,10 @@ def generate_static_rir_with_mic(
     rir_duration_s: Optional[float] = None,
     c: float = SPEED_OF_SOUND,
 ) -> RIR:
-    """Variant of generate_static_rir that takes explicit mic_pos.
-
-    This allows correct geometric placement of image sources relative to the
-    microphone rather than the world origin.
-
-    Parameters
-    ----------
-    mic_pos : array_like (3,)   microphone world position (m)
-    (other parameters same as generate_static_rir)
-    """
-    mic_pos = np.asarray(mic_pos, dtype=np.float64)
-
-    rt60_estimate = reflection_data.late_tail_spec.rt60_s
-    mixing_time_ms = reflection_data.late_tail_spec.mixing_time_ms
-    seed = reflection_data.late_tail_spec.seed
-
-    if rir_duration_s is not None:
-        n_samples = int(min(rir_duration_s * fs, MAX_RIR_DURATION_S * fs))
-    else:
-        raw_dur = max(3.0 * rt60_estimate, _MIN_RIR_DURATION_S)
-        n_samples = int(min(raw_dur * fs, MAX_RIR_DURATION_S * fs))
-
-    n_samples = max(n_samples, 1)
-    h = np.zeros(n_samples, dtype=np.float64)
-
-    occ_gain = 10.0 ** (-occlusion_result.loss_db / 20.0)
-    direct_amplitude = direct_path.attenuation_linear * occ_gain
-
-    direct_idx = int(direct_path.delay_samples)
-    if 0 <= direct_idx < n_samples:
-        h[direct_idx] += direct_amplitude
-
-    for img in reflection_data.image_sources:
-        img_pos = np.asarray(img.position, dtype=np.float64)
-        dist_img = float(np.linalg.norm(img_pos - mic_pos))
-        delay_samples_img = int(round(dist_img / c * fs))
-        if 0 <= delay_samples_img < n_samples:
-            h[delay_samples_img] += float(img.path_gain)
-
-    mixing_onset_sample = int(round(mixing_time_ms * 1e-3 * fs))
-    tail = generate_late_reverb_tail(
-        rt60_s=rt60_estimate,
-        mixing_time_ms=mixing_time_ms,
-        fs=fs,
-        n_samples=n_samples,
-        seed=seed,
-    ).astype(np.float64)
-
-    tail_rms = float(np.sqrt(np.mean(tail[mixing_onset_sample:] ** 2) + 1e-30))
-    tail_target_rms = max(direct_amplitude * 0.1, 1e-9)
-    tail_scaled = tail * (tail_target_rms / tail_rms)
-
-    tail_len = min(len(tail_scaled), n_samples)
-    h[:tail_len] += tail_scaled[:tail_len]
-
-    h_f32 = h.astype(np.float32)
-
-    try:
-        rt60_result = fit_rt60(h_f32, fs=fs, target_rt60=None)
-        rt60_measured = float(rt60_result["rt60_measured_s"])
-    except Exception:
-        rt60_measured = rt60_estimate
-
-    direct_window_start = max(0, direct_idx - 1)
-    direct_window_end   = min(n_samples, direct_idx + 2)
-    e_direct = float(np.sum(h[direct_window_start:direct_window_end] ** 2))
-    e_reverb  = float(np.sum(h[:direct_window_start] ** 2)) + float(np.sum(h[direct_window_end:] ** 2))
-
-    if e_direct < 1e-30:
-        drr_db = -60.0
-    elif e_reverb < 1e-30:
-        drr_db = 60.0
-    else:
-        drr_db = float(10.0 * math.log10(e_direct / e_reverb))
-
-    peak_delay = int(np.argmax(np.abs(h_f32)))
-
-    return RIR(
-        source_id=direct_path.source_id,
-        receiver_id=direct_path.receiver_id,
-        h=h_f32,
-        fs=fs,
-        rt60_measured_s=rt60_measured,
-        drr_db=drr_db,
-        peak_delay_samples=peak_delay,
+    """Variant of :func:`generate_static_rir` with a mandatory ``mic_pos``."""
+    return generate_static_rir(
+        direct_path, reflection_data, occlusion_result, fs,
+        rir_duration_s=rir_duration_s, c=c, mic_pos=mic_pos,
     )
 
 

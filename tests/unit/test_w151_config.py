@@ -334,3 +334,61 @@ class TestDeriveSubsystemSeeds:
         seeds = derive_subsystem_seeds(7, subsystem_names=custom)
         assert set(seeds.keys()) == set(custom)
         assert len(seeds) == 3
+
+
+# ---------------------------------------------------------------------------
+# Audit F-02 / design §3.1: IDs, positions, impairment ranges
+# ---------------------------------------------------------------------------
+
+class TestEntityValidation:
+    def _raw(self):
+        return _minimal_raw()
+
+    def test_duplicate_source_id_rejected(self):
+        raw = self._raw()
+        raw["sources"] = [raw["sources"][0], dict(raw["sources"][0])]
+        with pytest.raises(ValidationError, match="Duplicate source_id"):
+            SceneConfigValidator().validate(raw)
+
+    def test_duplicate_receiver_id_rejected(self):
+        raw = self._raw()
+        raw["receivers"] = [raw["receivers"][0], dict(raw["receivers"][0])]
+        with pytest.raises(ValidationError, match="Duplicate receiver_id"):
+            SceneConfigValidator().validate(raw)
+
+    @pytest.mark.parametrize("bad", ["a__b", "a/b", "", "x" * 65, "sp ace"])
+    def test_unsafe_id_rejected(self, bad):
+        raw = self._raw()
+        raw["sources"][0]["source_id"] = bad
+        with pytest.raises(ValidationError):
+            SceneConfigValidator().validate(raw)
+
+    def test_position_outside_room_rejected(self):
+        raw = self._raw()
+        raw["receivers"][0]["position"] = [100.0, 1.5, 2.0]
+        with pytest.raises(ValidationError, match="outside the room"):
+            SceneConfigValidator().validate(raw)
+
+    def test_non_finite_position_rejected(self):
+        raw = self._raw()
+        raw["sources"][0]["position"] = [float("nan"), 1.0, 1.0]
+        with pytest.raises(ValidationError):
+            SceneConfigValidator().validate(raw)
+
+    def test_packet_error_rate_range(self):
+        raw = self._raw()
+        raw["impairments"] = {"type": "packet_loss", "packet_error_rate": 0.5}
+        with pytest.raises(ValidationError):
+            SceneConfigValidator().validate(raw)
+        raw["impairments"]["allow_stress"] = True
+        SceneConfigValidator().validate(raw)
+
+    def test_extras_round_trip(self):
+        from simulator.uf.w151_config import scene_config_to_dict
+        raw = self._raw()
+        raw["render"] = {"tail": "trim"}
+        raw["reference_receiver"] = raw["receivers"][0]["receiver_id"]
+        cfg = SceneConfigValidator().validate(raw)
+        back = scene_config_to_dict(cfg)
+        assert back["render"] == {"tail": "trim"} and "extras" not in back
+        assert SceneConfigValidator().validate(back) == cfg

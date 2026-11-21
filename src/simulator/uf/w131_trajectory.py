@@ -223,11 +223,11 @@ def _build_waypoint_positions(
 
     # Evenly distribute ticks across segments
     segment_fracs = np.linspace(0.0, float(n_wp - 1), n_ticks)
-    seg_idx = np.floor(segment_fracs).astype(int)
-    seg_frac = segment_fracs - seg_idx
-
-    seg_idx = np.clip(seg_idx, 0, n_wp - 2)
-    seg_frac = np.clip(seg_frac, 0.0, 1.0)
+    # Clip the segment index *before* computing the in-segment fraction so the
+    # final tick (fraction n_wp-1) maps to segment n_wp-2 with fraction 1.0,
+    # i.e. exactly the last waypoint.
+    seg_idx = np.clip(np.floor(segment_fracs).astype(int), 0, n_wp - 2)
+    seg_frac = np.clip(segment_fracs - seg_idx, 0.0, 1.0)
 
     positions = (
         waypoints[seg_idx] * (1.0 - seg_frac[:, np.newaxis]) +
@@ -381,8 +381,17 @@ def generate_source_trajectory(
             "Choose from: static, linear, random_walk, waypoint, conversational."
         )
 
-    # Enforce room constraints
-    positions = enforce_room_constraints(positions, room_bbox, margin)
+    # Enforce room constraints.  An explicitly configured static position is
+    # never moved silently: it must lie inside the room, otherwise ValueError.
+    explicit_static = motion_type == "static" and kwargs.get("position") is not None
+    if explicit_static:
+        if not room_bbox.contains(positions[0]):
+            raise ValueError(
+                f"Static source position {positions[0].tolist()} lies outside the room "
+                f"[{room_bbox.min_corner.tolist()}, {room_bbox.max_corner.tolist()}]."
+            )
+    else:
+        positions = enforce_room_constraints(positions, room_bbox, margin)
 
     # Compute velocities and orientations
     velocities, orientations = compute_velocity_orientation(positions, tick_rate_hz)

@@ -100,10 +100,15 @@ def test_packet_loss_zero_segments():
 
 
 def test_packet_loss_all_dropped():
-    """PER=1.0 → all segments zeroed."""
+    """PER=1.0 (explicit stress condition) → all segments zeroed.
+
+    PER is limited to [0, 0.2] by requirement; values above need allow_stress=True
+    (see test_packet_loss_invalid_per).  Design doc §8.
+    """
     sig = white_noise(n=3200)
     out, n_dropped, total = apply_packet_loss(
-        sig, fs=FS, packet_error_rate=1.0, segment_duration_ms=20.0, seed=0
+        sig, fs=FS, packet_error_rate=1.0, segment_duration_ms=20.0, seed=0,
+        allow_stress=True,
     )
     assert n_dropped == total
     assert np.allclose(out, 0.0)

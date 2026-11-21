@@ -9,6 +9,8 @@ Implements UF-W151-01 through UF-W151-05:
 from __future__ import annotations
 
 import json
+import math
+import re
 import sys
 import os
 import warnings
@@ -34,6 +36,14 @@ from simulator.types import (
 # ---------------------------------------------------------------------------
 
 SCENE_CONFIG_SCHEMA_VERSION: str = "1.0.0"
+
+# Entity IDs become file-name components (``reference__{src}__{rec}.wav``), so
+# they must be filesystem-safe and must not contain the "__" separator.
+ENTITY_ID_PATTERN = re.compile(r"^[A-Za-z0-9.-]+(?:_[A-Za-z0-9.-]+)*$")
+ENTITY_ID_MAX_LEN = 64
+
+# Optional top-level keys carried through SceneConfig.extras (static_v1 contract).
+EXTRA_TOP_LEVEL_KEYS = ("render", "qc", "reference_receiver")
 
 _SUBSYSTEM_NAMES: List[str] = [
     "room",
@@ -81,6 +91,67 @@ def _require_type(value: object, expected_type, key: str) -> None:
         raise ValidationError(
             f"Expected {expected_type.__name__}, got {type(value).__name__}.",
             field_path=key,
+        )
+
+
+def position_to_list(pos, field_path: str) -> List[float]:
+    """Normalise a position given as ``[x, y, z]`` or ``{"x":..,"y":..,"z":..}``.
+
+    Raises ValidationError if the value is not three finite numbers.
+    """
+    if isinstance(pos, dict):
+        try:
+            pos = [pos["x"], pos["y"], pos["z"]]
+        except KeyError as exc:
+            raise ValidationError(
+                f"Position dict must have keys x, y, z (missing {exc}).", field_path=field_path
+            )
+    if not isinstance(pos, (list, tuple)) or len(pos) != 3:
+        raise ValidationError(
+            "Position must be [x, y, z] or {x, y, z}.", field_path=field_path
+        )
+    out = []
+    for v in pos:
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(float(v)):
+            raise ValidationError(
+                f"Position components must be finite numbers, got {pos!r}.",
+                field_path=field_path,
+            )
+        out.append(float(v))
+    return out
+
+
+def _validate_entity_ids(entities: list, key: str, list_name: str) -> None:
+    seen = {}
+    for i, ent in enumerate(entities):
+        eid = ent[key]
+        path = f"{list_name}[{i}].{key}"
+        if not eid or len(eid) > ENTITY_ID_MAX_LEN or not ENTITY_ID_PATTERN.match(eid):
+            raise ValidationError(
+                f"{key} {eid!r} must match {ENTITY_ID_PATTERN.pattern} "
+                f"(letters, digits, '.', '-', single '_'; max {ENTITY_ID_MAX_LEN} chars).",
+                field_path=path,
+            )
+        if eid in seen:
+            raise ValidationError(
+                f"Duplicate {key} {eid!r} (also at {list_name}[{seen[eid]}]).",
+                field_path=path,
+            )
+        seen[eid] = i
+
+
+def _validate_inside_shoebox(pos: List[float], dims: dict, field_path: str) -> None:
+    """Y-up convention: x in [0, L], y in [0, H], z in [0, W]."""
+    try:
+        L, H, W = float(dims["L"]), float(dims["H"]), float(dims["W"])
+    except (KeyError, TypeError, ValueError):
+        return  # dimension errors are reported separately
+    x, y, z = pos
+    if not (0.0 < x < L and 0.0 < y < H and 0.0 < z < W):
+        raise ValidationError(
+            f"Position {pos} lies outside the room interior "
+            f"(x in (0, {L}), y in (0, {H}), z in (0, {W}); Y-up).",
+            field_path=field_path,
         )
 
 
@@ -230,6 +301,56 @@ class SceneConfigValidator:
                     field_path=f"receivers[{i}]",
                 )
 
+        # ---- IDs: unique and filesystem-safe ----
+        _validate_entity_ids(sources_raw, "source_id", "sources")
+        _validate_entity_ids(receivers_raw, "receiver_id", "receivers")
+
+        # ---- room dimensions and positions ----
+        room_type = room_raw["type"]
+        if room_type in ("shoebox", "corridor", "hall"):
+            for k in ("L", "W", "H"):
+                v = room_dims.get(k)
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or not (
+                    math.isfinite(float(v)) and float(v) > 0
+                ):
+                    raise ValidationError(
+                        f"room.dimensions.{k} must be a positive finite number, got {v!r}.",
+                        field_path=f"room.dimensions.{k}",
+                    )
+        for list_name, entities in (("sources", sources_raw), ("receivers", receivers_raw)):
+            for i, ent in enumerate(entities):
+                if "position" in ent and ent["position"] is not None:
+                    pos = position_to_list(ent["position"], f"{list_name}[{i}].position")
+                    if room_type == "shoebox":
+                        _validate_inside_shoebox(pos, room_dims, f"{list_name}[{i}].position")
+
+        # ---- impairments ----
+        imp = raw_config.get("impairments") or {}
+        if not isinstance(imp, dict):
+            raise ValidationError("impairments must be a dict.", field_path="impairments")
+        per = imp.get("packet_error_rate")
+        if per is not None and not (0.0 <= float(per) <= (1.0 if imp.get("allow_stress") else 0.2)):
+            raise ValidationError(
+                f"packet_error_rate={per} outside [0, 0.2] (set allow_stress for stress tests).",
+                field_path="impairments.packet_error_rate",
+            )
+        arr = imp.get("array_errors")
+        if arr is not None:
+            if not isinstance(arr, dict):
+                raise ValidationError("array_errors must be a dict.", field_path="impairments.array_errors")
+            sig = float(arr.get("position_sigma_m", 0.0))
+            skew = arr.get("max_clock_skew_samples", 0)
+            if not (math.isfinite(sig) and 0.0 <= sig <= 0.1):
+                raise ValidationError(
+                    f"position_sigma_m={sig} outside [0, 0.1] m.",
+                    field_path="impairments.array_errors.position_sigma_m",
+                )
+            if isinstance(skew, bool) or not isinstance(skew, int) or not (0 <= skew <= 64):
+                raise ValidationError(
+                    f"max_clock_skew_samples={skew!r} must be an int in [0, 64].",
+                    field_path="impairments.array_errors.max_clock_skew_samples",
+                )
+
         # ---- sample_rate ----
         sample_rate: int = raw_config.get("sample_rate", 16000)
         if not isinstance(sample_rate, int):
@@ -278,6 +399,7 @@ class SceneConfigValidator:
             sample_rate=sample_rate,
             ism_order=ism_order,
             speed_of_sound=speed_of_sound,
+            extras={k: raw_config[k] for k in EXTRA_TOP_LEVEL_KEYS if k in raw_config},
         )
 
 
@@ -336,7 +458,7 @@ def save_config_to_file(config: SceneConfig, path: str) -> None:
 
     # Convert dataclass → dict; numpy arrays become lists automatically via
     # a custom encoder because json.dumps default doesn't handle ndarray.
-    raw = dataclasses.asdict(config)
+    raw = scene_config_to_dict(config)
 
     class _NumpyEncoder(json.JSONEncoder):
         def default(self, obj):
@@ -443,3 +565,18 @@ if __name__ == "__main__":
         print(f"  version 2.0.0 correctly raised: {e}")
 
     print("  PASS")
+
+
+def scene_config_to_dict(config: SceneConfig) -> dict:
+    """Inverse of :meth:`SceneConfigValidator.validate`: SceneConfig → raw dict.
+
+    ``extras`` (render / qc / reference_receiver) are flattened back to the top
+    level so that the result validates to an equal SceneConfig.
+    """
+    import copy
+    import dataclasses
+    raw = dataclasses.asdict(config)
+    extras = raw.pop("extras", None) or {}
+    for k, v in extras.items():
+        raw[k] = copy.deepcopy(v)
+    return raw

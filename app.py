@@ -32,6 +32,14 @@ import plotly.graph_objects as go
 from simulator.if_modules.orchestration import simulate_scene
 from simulator.types import SceneConfig
 from simulator.uf.w151_config import SceneConfigValidator, ValidationError
+from simulator.config_resolver import (
+    apply_editor_overrides,
+    editor_view,
+    load_raw_config,
+    preflight,
+    strip_private,
+)
+from simulator.runner import run_config_files, summarize
 from simulator.scenarios.zoom_meeting import (
     generate_zoom_scenario,
     generate_zoom_scenarios,
@@ -146,121 +154,97 @@ def make_room_plot(
 
 
 # ---------------------------------------------------------------------------
-# Config builder helper
+# Config builder helpers (Scene Editor ↔ config_resolver)
 # ---------------------------------------------------------------------------
 
-def _build_config_dict(
-    scene_id: str,
-    seed: int,
-    room_L: float, room_W: float, room_H: float,
-    material: str,
-    ism_order: int,
-    sample_rate: int,
-    n_sources: int,
-    s0x: float, s0y: float, s0z: float,
-    s1x: float, s1y: float, s1z: float,
-    s2x: float, s2y: float, s2z: float,
-    n_receivers: int,
-    r0x: float, r0y: float, r0z: float,
-    r1x: float, r1y: float, r1z: float,
-    r2x: float, r2y: float, r2z: float,
-    r3x: float, r3y: float, r3z: float,
-    output_dir: str = "output",
+def _editor_edits(
+    scene_id, seed, room_L, room_W, room_H, material, ism_order, sample_rate,
+    n_sources, s0x, s0y, s0z, s1x, s1y, s1z, s2x, s2y, s2z,
+    n_receivers, r0x, r0y, r0z, r1x, r1y, r1z, r2x, r2y, r2z, r3x, r3y, r3z,
 ) -> dict:
-    source_positions = [
-        [s0x, s0y, s0z],
-        [s1x, s1y, s1z],
-        [s2x, s2y, s2z],
-    ]
-    receiver_positions = [
-        [r0x, r0y, r0z],
-        [r1x, r1y, r1z],
-        [r2x, r2y, r2z],
-        [r3x, r3y, r3z],
-    ]
-    sources = [
-        {"source_id": f"s{i}", "position": source_positions[i]}
-        for i in range(int(n_sources))
-    ]
-    receivers = [
-        {"receiver_id": f"r{i}", "position": receiver_positions[i]}
-        for i in range(int(n_receivers))
-    ]
+    """Scene-Editor widget values → edits for config_resolver.apply_editor_overrides."""
     return {
-        "scene_id": scene_id,
+        "scene_id": scene_id or "scene_001",
         "seed": int(seed),
-        "schema_version": "1.0.0",
-        "room": {"type": "shoebox", "dimensions": {"L": room_L, "W": room_W, "H": room_H}},
-        "materials": {"default": material},
-        "sources": sources,
-        "receivers": receivers,
-        "sample_rate": int(sample_rate),
+        "room_dims": {"L": room_L, "W": room_W, "H": room_H},
+        "material": material,
         "ism_order": int(ism_order),
-        "output_dir": output_dir,
+        "sample_rate": int(sample_rate),
+        "n_sources": int(n_sources),
+        "source_positions": [[s0x, s0y, s0z], [s1x, s1y, s1z], [s2x, s2y, s2z]],
+        "n_receivers": int(n_receivers),
+        "receiver_positions": [[r0x, r0y, r0z], [r1x, r1y, r1z], [r2x, r2y, r2z], [r3x, r3y, r3z]],
     }
+
+
+def _editor_config(base_cfg, *widget_values) -> dict:
+    """Merge the editor into the imported base config (IDs, obstacles, devices kept)."""
+    return apply_editor_overrides(base_cfg, _editor_edits(*widget_values), MAX_SOURCES, MAX_RECEIVERS)
+
+
+def _fmt(v, spec=".2f") -> str:
+    return "—" if v is None else format(v, spec)
+
+
+def _resolve_manifest_path(manifest: dict, manifest_path: str, rel: str) -> str:
+    """Manifest v2 paths are relative to the dataset root (= manifest dir's parent)."""
+    if os.path.isabs(rel):
+        return rel
+    return str(Path(manifest_path).parent.parent / rel)
 
 
 # ---------------------------------------------------------------------------
 # Simulation runner
 # ---------------------------------------------------------------------------
 
-def run_single_scene(
-    scene_id, seed,
-    room_L, room_W, room_H, material,
-    ism_order, sample_rate,
-    n_sources,
-    s0x, s0y, s0z, s1x, s1y, s1z, s2x, s2y, s2z,
-    n_receivers,
-    r0x, r0y, r0z, r1x, r1y, r1z, r2x, r2y, r2z, r3x, r3y, r3z,
-):
-    """Called by the Generate button — returns audio paths + summary + plot."""
+def run_single_scene(*args):
+    """Generate button: merge editor into base config → preflight → simulate."""
+    *widget_values, base_cfg = args
     tmp_dir = tempfile.mkdtemp(prefix="w100000_")
-    cfg_dict = _build_config_dict(
-        scene_id=scene_id or "scene_001",
-        seed=seed, room_L=room_L, room_W=room_W, room_H=room_H,
-        material=material, ism_order=ism_order, sample_rate=sample_rate,
-        n_sources=n_sources,
-        s0x=s0x, s0y=s0y, s0z=s0z,
-        s1x=s1x, s1y=s1y, s1z=s1z,
-        s2x=s2x, s2y=s2y, s2z=s2z,
-        n_receivers=n_receivers,
-        r0x=r0x, r0y=r0y, r0z=r0z,
-        r1x=r1x, r1y=r1y, r1z=r1z,
-        r2x=r2x, r2y=r2y, r2z=r2z,
-        r3x=r3x, r3y=r3y, r3z=r3z,
-        output_dir=tmp_dir,
-    )
+    cfg_dict = _editor_config(base_cfg, *widget_values)
+    cfg_dict["output_dir"] = tmp_dir
+    pf = preflight(cfg_dict)
+    if not pf["ok"]:
+        return None, None, None, None, "Preflight failed:\n- " + "\n- ".join(pf["errors"]), None
     try:
-        config = SceneConfigValidator().validate(cfg_dict)
+        config = SceneConfigValidator().validate(strip_private(cfg_dict))
         result = simulate_scene(config)
     except ValidationError as e:
         return None, None, None, None, f"Validation error: {e}", None
     except Exception as e:
-        return None, None, None, None, f"Simulation error: {e}", None
+        return None, None, None, None, f"Simulation error: {type(e).__name__}: {e}", None
 
-    # Collect WAV paths
     manifest_path = result.get("manifest_path", "")
     wav_paths: List[str] = []
     if manifest_path and os.path.exists(manifest_path):
         with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
-        wav_paths = [p for p in manifest.get("audio_files", []) if os.path.exists(p)]
+        wav_paths = [
+            p for p in (_resolve_manifest_path(manifest, manifest_path, r) for r in manifest.get("audio_files", []))
+            if os.path.exists(p)
+        ]
 
     summary = result.get("acoustic_summary")
     summary_rows = []
     if summary:
         summary_rows = [
-            ["RT60 (s)", f"{summary.rt60_measured_s:.3f}"],
-            ["DRR (dB)", f"{summary.drr_db:.1f}"],
-            ["SNR (dB)", f"{summary.snr_db:.1f}"],
-            ["DOA Az (°)", f"{summary.doa_az_deg:.1f}"],
-            ["DOA El (°)", f"{summary.doa_el_deg:.1f}"],
-            ["Elapsed (s)", f"{result.get('elapsed_s', 0):.2f}"],
+            ["RT60 (s)", _fmt(summary.rt60_measured_s, ".3f")],
+            ["DRR (dB)", _fmt(summary.drr_db, ".1f")],
+            ["SNR (dB)", _fmt(summary.snr_db, ".1f")],
+            ["DOA Az (°)", _fmt(summary.doa_az_deg, ".1f")],
+            ["DOA El (°)", _fmt(summary.doa_el_deg, ".1f")],
+            ["Elapsed (s)", _fmt(result.get("elapsed_s", 0.0), ".2f")],
+            ["Signature", pf["signature"]],
         ]
 
-    # Return up to 4 audio files
     audio_out = [wav_paths[i] if i < len(wav_paths) else None for i in range(4)]
-    status_msg = f"✅ Done — {len(wav_paths)} audio file(s) written to {tmp_dir}"
+    notes = ""
+    if pf["approximations"] or pf["warnings"]:
+        notes = "\nNotes: " + "; ".join(pf["approximations"] + pf["warnings"])
+    status_msg = (
+        f"✅ Done — {len(wav_paths)} mixture file(s) of {len(config.receivers)} receiver(s), "
+        f"{len(config.sources)} source(s), signature {pf['signature']} → {result['output_dir']}{notes}"
+    )
     return audio_out[0], audio_out[1], audio_out[2], audio_out[3], status_msg, summary_rows
 
 
@@ -286,31 +270,11 @@ def update_plot(
 # Config I/O
 # ---------------------------------------------------------------------------
 
-def export_config(
-    scene_id, seed,
-    room_L, room_W, room_H, material,
-    ism_order, sample_rate,
-    n_sources,
-    s0x, s0y, s0z, s1x, s1y, s1z, s2x, s2y, s2z,
-    n_receivers,
-    r0x, r0y, r0z, r1x, r1y, r1z, r2x, r2y, r2z, r3x, r3y, r3z,
-):
-    cfg = _build_config_dict(
-        scene_id=scene_id or "scene_001",
-        seed=seed, room_L=room_L, room_W=room_W, room_H=room_H,
-        material=material, ism_order=ism_order, sample_rate=sample_rate,
-        n_sources=n_sources,
-        s0x=s0x, s0y=s0y, s0z=s0z,
-        s1x=s1x, s1y=s1y, s1z=s1z,
-        s2x=s2x, s2y=s2y, s2z=s2z,
-        n_receivers=n_receivers,
-        r0x=r0x, r0y=r0y, r0z=r0z,
-        r1x=r1x, r1y=r1y, r1z=r1z,
-        r2x=r2x, r2y=r2y, r2z=r2z,
-        r3x=r3x, r3y=r3y, r3z=r3z,
-    )
-    text = json.dumps(cfg, indent=2)
-    # Write to temp file for download
+def export_config(*args):
+    """Export the merged config (base config + editor edits) as JSON."""
+    *widget_values, base_cfg = args
+    cfg = _editor_config(base_cfg, *widget_values)
+    text = json.dumps(cfg, indent=2, ensure_ascii=False)
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False,
         prefix="scene_config_", encoding="utf-8"
@@ -321,51 +285,62 @@ def export_config(
 
 
 def import_config(file_obj):
-    """Load JSON config file → return values for all fields."""
-    if file_obj is None:
-        return [gr.update()] * 30 + ["No file uploaded."]
-    try:
-        with open(file_obj.name, encoding="utf-8") as f:
-            cfg = json.load(f)
-    except Exception as e:
-        return [gr.update()] * 30 + [f"Error reading file: {e}"]
+    """Load a JSON/YAML config → editor values + base-config state.
 
-    room = cfg.get("room", {}).get("dimensions", {})
-    mats = cfg.get("materials", {})
-    sources = cfg.get("sources", [])
-    receivers = cfg.get("receivers", [])
+    The full config is kept in gr.State so export/run preserve everything the
+    editor cannot show (extra sources, obstacles, IDs, devices, metadata).
+    """
+    n_out = 31  # Scene Editor widgets (8 scalars + 1 + 9 + 1 + 12)
+    if file_obj is None:
+        return [gr.update()] * n_out + ["No file uploaded.", gr.update()]
+    try:
+        cfg = load_raw_config(file_obj.name)
+    except Exception as e:
+        return [gr.update()] * n_out + [f"Error reading file: {e}", gr.update()]
+
+    v = editor_view(cfg, MAX_SOURCES, MAX_RECEIVERS)
 
     def _pos(lst, idx, axis):
-        if idx < len(lst):
-            pos = lst[idx].get("position", [1.0, 1.0, 1.0])
-            return float(pos[axis]) if axis < len(pos) else 1.0
+        if idx < len(lst) and lst[idx] is not None:
+            return float(lst[idx][axis])
         return 1.0
 
-    mat_val = list(mats.values())[0] if mats else "concrete"
-    if mat_val not in MATERIAL_PRESETS:
-        mat_val = "concrete"
-
+    srcs, recs = v["source_positions"], v["receiver_positions"]
+    mat_val = v["material"] if v["material"] in MATERIAL_PRESETS else "concrete"
     updates = [
-        gr.update(value=cfg.get("scene_id", "scene_001")),
-        gr.update(value=int(cfg.get("seed", 42))),
-        gr.update(value=float(room.get("L", 5.0))),
-        gr.update(value=float(room.get("W", 4.0))),
-        gr.update(value=float(room.get("H", 3.0))),
+        gr.update(value=v["scene_id"]),
+        gr.update(value=v["seed"]),
+        gr.update(value=v["room_dims"]["L"]),
+        gr.update(value=v["room_dims"]["W"]),
+        gr.update(value=v["room_dims"]["H"]),
         gr.update(value=mat_val),
-        gr.update(value=int(cfg.get("ism_order", 3))),
-        gr.update(value=int(cfg.get("sample_rate", 16000))),
-        gr.update(value=min(len(sources), MAX_SOURCES)),
-        gr.update(value=_pos(sources, 0, 0)), gr.update(value=_pos(sources, 0, 1)), gr.update(value=_pos(sources, 0, 2)),
-        gr.update(value=_pos(sources, 1, 0)), gr.update(value=_pos(sources, 1, 1)), gr.update(value=_pos(sources, 1, 2)),
-        gr.update(value=_pos(sources, 2, 0)), gr.update(value=_pos(sources, 2, 1)), gr.update(value=_pos(sources, 2, 2)),
-        gr.update(value=min(len(receivers), MAX_RECEIVERS)),
-        gr.update(value=_pos(receivers, 0, 0)), gr.update(value=_pos(receivers, 0, 1)), gr.update(value=_pos(receivers, 0, 2)),
-        gr.update(value=_pos(receivers, 1, 0)), gr.update(value=_pos(receivers, 1, 1)), gr.update(value=_pos(receivers, 1, 2)),
-        gr.update(value=_pos(receivers, 2, 0)), gr.update(value=_pos(receivers, 2, 1)), gr.update(value=_pos(receivers, 2, 2)),
-        gr.update(value=_pos(receivers, 3, 0)), gr.update(value=_pos(receivers, 3, 1)), gr.update(value=_pos(receivers, 3, 2)),
-        f"✅ Config loaded: {len(sources)} source(s), {len(receivers)} receiver(s)",
+        gr.update(value=v["ism_order"]),
+        gr.update(value=v["sample_rate"]),
+        gr.update(value=max(1, min(v["n_sources_total"], MAX_SOURCES))),
+        *[gr.update(value=_pos(srcs, i, a)) for i in range(3) for a in range(3)],
+        gr.update(value=max(1, min(v["n_receivers_total"], MAX_RECEIVERS))),
+        *[gr.update(value=_pos(recs, i, a)) for i in range(4) for a in range(3)],
     ]
-    return updates
+    pf = preflight(cfg)
+    msg = (
+        f"✅ Loaded {v['n_sources_total']} source(s), {v['n_receivers_total']} receiver(s), "
+        f"{v['n_obstacles']} obstacle(s); signature {pf['signature'] or 'n/a'}."
+    )
+    hidden = []
+    if v["n_sources_hidden"]:
+        hidden.append(f"{v['n_sources_hidden']} source(s)")
+    if v["n_receivers_hidden"]:
+        hidden.append(f"{v['n_receivers_hidden']} receiver(s)")
+    if hidden:
+        msg += f" Editor shows the first {MAX_SOURCES}/{MAX_RECEIVERS}; {', '.join(hidden)} are kept unchanged."
+    if mat_val != v["material"]:
+        msg += f" Material {v['material']!r} is not a preset; it is kept in the config."
+        updates[5] = gr.update()
+    if v["per_surface_materials"]:
+        msg += f" Per-surface materials kept: {v['per_surface_materials']}."
+    if pf["errors"]:
+        msg += " Preflight errors: " + "; ".join(pf["errors"])
+    return updates + [msg, cfg]
 
 
 # ---------------------------------------------------------------------------
@@ -429,7 +404,9 @@ def run_batch_generation(
 
         yield rows, f"Progress: {i+1}/{int(n_scenes)}"
 
-    yield rows, f"✅ Batch complete — {int(n_scenes)} scene(s) written to {output_dir}"
+    n_fail = sum(1 for r in rows if not r[1].startswith("✅"))
+    head = "✅ Batch complete" if n_fail == 0 else f"⚠ Batch finished with {n_fail} failure(s)"
+    yield rows, f"{head} — {len(rows) - n_fail}/{int(n_scenes)} scene(s) written to {output_dir}"
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +427,8 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
 
     # ---- shared state -------------------------------------------------------
     active_target = gr.State("source_0")  # which point is active for click-to-place
+
+    base_config_state = gr.State(None)  # full imported config (kept across edits)
 
     with gr.Tabs():
         # =====================================================================
@@ -560,7 +539,7 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
             ]
             run_btn.click(
                 fn=run_single_scene,
-                inputs=_sim_inputs,
+                inputs=_sim_inputs + [base_config_state],
                 outputs=[audio_r0, audio_r1, audio_r2, audio_r3, sim_status, summary_table],
             )
 
@@ -632,6 +611,10 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
                 "to view audio, acoustic metrics, and plots."
             )
             manifest_upload = gr.File(label="Upload scene_manifest.json", file_types=[".json"])
+            viewer_root = gr.Textbox(
+                label="Dataset root (folder that contains the scene folders)",
+                value="output/results",
+            )
             load_manifest_btn = gr.Button("Load Manifest")
 
             with gr.Row():
@@ -647,7 +630,7 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
             )
             viewer_manifest_json = gr.Code(label="Manifest JSON", language="json")
 
-            def load_manifest_file(file_obj):
+            def load_manifest_file(file_obj, dataset_root):
                 if file_obj is None:
                     return None, None, None, None, [], ""
                 try:
@@ -656,7 +639,13 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
                 except Exception as e:
                     return None, None, None, None, [["Error", str(e)]], ""
 
-                wav_paths = [p for p in manifest.get("audio_files", []) if os.path.exists(p)]
+                wav_paths = []
+                for rel in manifest.get("audio_files", []):
+                    for cand in (os.path.join(dataset_root or "", rel),
+                                 _resolve_manifest_path(manifest, file_obj.name, rel)):
+                        if os.path.exists(cand):
+                            wav_paths.append(cand)
+                            break
                 audio_out = [wav_paths[i] if i < len(wav_paths) else None for i in range(4)]
 
                 ac = manifest.get("acoustic_summary", {})
@@ -670,7 +659,7 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
 
             load_manifest_btn.click(
                 fn=load_manifest_file,
-                inputs=[manifest_upload],
+                inputs=[manifest_upload, viewer_root],
                 outputs=[
                     viewer_audio_r0, viewer_audio_r1, viewer_audio_r2, viewer_audio_r3,
                     viewer_summary, viewer_manifest_json,
@@ -710,7 +699,7 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
             ]
             export_btn.click(
                 fn=export_config,
-                inputs=_export_inputs,
+                inputs=_export_inputs + [base_config_state],
                 outputs=[config_download, config_preview],
             )
 
@@ -721,7 +710,7 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
                 s0x, s0y, s0z, s1x, s1y, s1z, s2x, s2y, s2z,
                 n_receivers_in,
                 r0x, r0y, r0z, r1x, r1y, r1z, r2x, r2y, r2z, r3x, r3y, r3z,
-                import_status,
+                import_status, base_config_state,
             ]
             import_btn.click(
                 fn=import_config,
@@ -895,7 +884,7 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
                     run_files_upload = gr.File(
                         label="Select Scenario JSON Files",
                         file_count="multiple",
-                        file_types=[".json"],
+                        file_types=[".json", ".yaml", ".yml"],
                     )
                     with gr.Row():
                         run_files_output_dir = gr.Textbox(label="Output Directory", value="output/results")
@@ -905,49 +894,26 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
                 with gr.Column(scale=1):
                     run_files_status = gr.Textbox(label="Status", interactive=False)
                     run_files_table = gr.Dataframe(
-                        headers=["Scene ID", "Status", "Elapsed", "RT60 (s)"],
+                        headers=["Scene / File", "Status", "Detail"],
                         label="Progress",
                         interactive=False,
                     )
 
-            def simulate_from_files(file_list, output_dir, n_workers, progress=gr.Progress(track_tqdm=True)):
+            def simulate_from_files(file_list, output_dir, n_workers):
+                """Validate + simulate via the shared runner (workers honoured,
+                verified resume, failures reported — never a blanket ✅)."""
                 if not file_list:
-                    yield [], "No files selected."
-                    return
-
-                configs = []
-                errors = []
-                for f in file_list:
-                    try:
-                        raw = load_scenario_from_file(f.name)
-                        raw["output_dir"] = output_dir
-                        # Remove internal metadata key before validation
-                        raw.pop("_zoom_meta", None)
-                        cfg = SceneConfigValidator().validate(raw)
-                        configs.append(cfg)
-                    except Exception as e:
-                        errors.append(f"Load error {os.path.basename(f.name)}: {e}")
-
-                if not configs:
-                    yield [], "\n".join(errors) or "No valid configs."
-                    return
-
-                rows = []
-                for cfg in progress.tqdm(configs, desc="Simulating scenes"):
-                    t0 = time.perf_counter()
-                    try:
-                        result = simulate_scene(cfg)
-                        elapsed = time.perf_counter() - t0
-                        summary = result.get("acoustic_summary")
-                        rt60 = f"{summary.rt60_measured_s:.3f}" if summary else "-"
-                        rows.append([cfg.scene_id, "✅ done", f"{elapsed:.2f}s", rt60])
-                    except Exception as e:
-                        elapsed = time.perf_counter() - t0
-                        rows.append([cfg.scene_id, f"❌ {str(e)[:40]}", f"{elapsed:.2f}s", "-"])
-                    yield rows, f"Progress: {len(rows)}/{len(configs)}"
-
-                error_msg = ("\n" + "\n".join(errors)) if errors else ""
-                yield rows, f"✅ Done — {len(configs)} scene(s) → {output_dir}{error_msg}"
+                    return [], "No files selected."
+                paths = [f.name for f in file_list]
+                try:
+                    summary, rows, load_errors = run_config_files(
+                        paths, output_dir, workers=int(n_workers)
+                    )
+                except Exception as e:
+                    return [], f"Run error: {type(e).__name__}: {e}"
+                table = [[sid, status, detail] for sid, status, detail in rows]
+                icon = "✅" if (summary.n_failed == 0 and not load_errors) else "⚠"
+                return table, f"{icon} {summarize(summary, len(load_errors))} → {output_dir}"
 
             run_files_btn.click(
                 fn=simulate_from_files,

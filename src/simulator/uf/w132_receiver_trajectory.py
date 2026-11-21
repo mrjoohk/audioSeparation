@@ -358,8 +358,18 @@ def generate_receiver_trajectory(
             "Choose from: static, handheld, wearable, robot, array_mounted."
         )
 
-    # Enforce room constraints
-    positions = _clamp_to_bbox(positions, room_bbox, margin)
+    # Enforce room constraints (explicit static positions are validated, not moved)
+    explicit_static = (
+        receiver_type in ("static", "array_mounted") and kwargs.get("position") is not None
+    )
+    if explicit_static:
+        if not room_bbox.contains(positions[0]):
+            raise ValueError(
+                f"Static receiver position {positions[0].tolist()} lies outside the room "
+                f"[{room_bbox.min_corner.tolist()}, {room_bbox.max_corner.tolist()}]."
+            )
+    else:
+        positions = _clamp_to_bbox(positions, room_bbox, margin)
 
     # Compute velocities (finite diff)
     velocities = np.zeros((n_ticks, 3), dtype=np.float64)

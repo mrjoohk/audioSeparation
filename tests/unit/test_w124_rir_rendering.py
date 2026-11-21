@@ -456,3 +456,27 @@ class TestRenderWaveform:
         for mode in ("full", "same", "OLA"):
             out = render_waveform(source, rir, mode=mode)
             assert np.all(np.isfinite(out)), f"Non-finite values in mode={mode}"
+
+
+def test_rir_finite_short_rt60():
+    """Audit F-01: empty late tail (mixing time ≥ RIR length) must not yield NaN."""
+    dp = _make_direct_path(distance_m=2.0, fs=16000, attenuation=0.5)
+    refl = _make_reflection_data(rt60_s=0.02, mixing_time_ms=600.0, seed=1)
+    rir = generate_static_rir(dp, refl, _make_no_occlusion(), fs=16000)
+    assert np.all(np.isfinite(rir.h))
+    assert rir.peak_delay_samples == dp.delay_samples
+
+
+def test_image_sources_never_precede_direct_path():
+    """ISM images for a room spanning [0, L] are never closer than the direct path."""
+    from simulator.uf.w122_reverberation import compute_image_sources
+    src = np.array([1.0, 1.2, 1.3])
+    mic = np.array([4.0, 1.5, 3.0])
+    imgs = compute_image_sources({"L": 5.0, "W": 4.0, "H": 3.0}, src, mic, ism_order=2)
+    d_direct = float(np.linalg.norm(src - mic))
+    assert min(float(np.linalg.norm(i.position - mic)) for i in imgs) > d_direct
+    # First-order images are mirror images across the six walls.
+    first = sorted(tuple(np.round(i.position, 6)) for i in imgs if i.reflection_order == 1)
+    expected = sorted([(-1.0, 1.2, 1.3), (9.0, 1.2, 1.3), (1.0, -1.2, 1.3),
+                       (1.0, 4.8, 1.3), (1.0, 1.2, -1.3), (1.0, 1.2, 6.7)])
+    assert first == expected

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import time
 import warnings
@@ -35,7 +36,24 @@ logger = logging.getLogger(__name__)
 
 
 class JobQueue:
-    """Thread/process-safe (single-writer) job queue with checkpoint support.
+    """Job queue with fingerprint-aware, output-verified checkpoint resume.
+
+    A job is skipped only when (design §4.5, F-08):
+      1. the checkpoint records it as ``completed`` with the same fingerprint, and
+      2. its committed output verifies (manifest fingerprint + file checksums).
+
+    Checkpoint v2 format::
+
+        {"schema": 2, "jobs": {scene_id: {"fingerprint", "status", "reason", "updated_at"}}}
+
+    A v1 checkpoint (JSON list of completed scene_ids) is accepted, but because it
+    carries no fingerprint a listed job is reused only if its output verifies
+    against the job's *current* fingerprint.
+
+    Args:
+        verify: "checksum" (default), "exists" (manifest + file sizes) or
+            "none" (trust the checkpoint fingerprint; for simulate_fns that do
+            not write v2 manifests).
 
     Usage::
 
@@ -45,24 +63,44 @@ class JobQueue:
             queue.mark_complete(cfg.scene_id)
     """
 
+    CHECKPOINT_SCHEMA = 2
+
     def __init__(
         self,
         configs: List[SceneConfig],
         checkpoint_file: Optional[str] = None,
+        verify: str = "checksum",
     ) -> None:
+        if verify not in ("checksum", "exists", "none"):
+            raise ValueError(f"verify must be checksum|exists|none, got {verify!r}")
         self._configs: List[SceneConfig] = list(configs)
         self._checkpoint_file: Optional[str] = checkpoint_file
-        self._completed_ids: set = set()
+        self._verify = verify
+        self._jobs: Dict[str, dict] = {}
+        self._legacy_ids: set = set()
+        self._fingerprints: Dict[str, str] = {}
+        self._skip: Optional[Dict[str, str]] = None   # scene_id -> reason for decision
+        self.decisions: Dict[str, str] = {}
 
-        # Load existing checkpoint if present
         if checkpoint_file:
             self.load_checkpoint()
 
     # ------------------------------------------------------------------
+    @property
+    def _completed_ids(self) -> set:
+        """IDs recorded as completed (v2) or listed in a v1 checkpoint."""
+        done = {sid for sid, j in self._jobs.items() if j.get("status") == "completed"}
+        return done | self._legacy_ids
+
+    def fingerprint(self, cfg: SceneConfig) -> str:
+        if cfg.scene_id not in self._fingerprints:
+            from simulator.config_resolver import render_fingerprint
+            from simulator.uf.w151_config import scene_config_to_dict
+            self._fingerprints[cfg.scene_id] = render_fingerprint(scene_config_to_dict(cfg))
+        return self._fingerprints[cfg.scene_id]
+
+    # ------------------------------------------------------------------
     def load_checkpoint(self) -> None:
-        """Read checkpoint_file (JSON list of completed scene_ids) and
-        mark those IDs as already completed so they are skipped during
-        iteration."""
         if not self._checkpoint_file:
             return
         p = Path(self._checkpoint_file)
@@ -72,52 +110,138 @@ class JobQueue:
         try:
             with p.open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
-            if isinstance(data, list):
-                self._completed_ids.update(data)
-                logger.info(
-                    "Checkpoint loaded: %d scene(s) already completed.",
-                    len(self._completed_ids),
-                )
-            else:
-                logger.warning("Checkpoint file has unexpected format; ignoring.")
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Failed to load checkpoint: %s", exc)
+            return
+        if isinstance(data, list):
+            self._legacy_ids.update(str(x) for x in data)
+            logger.info("Legacy checkpoint: %d id(s); outputs will be verified.", len(data))
+        elif isinstance(data, dict) and data.get("schema") == self.CHECKPOINT_SCHEMA:
+            self._jobs.update(data.get("jobs", {}))
+        else:
+            logger.warning("Checkpoint file has unexpected format; ignoring.")
 
-    def save_checkpoint(self, completed_ids: List[str]) -> None:
-        """Write *completed_ids* to checkpoint_file as a JSON array."""
+    def _write_checkpoint(self) -> None:
         if not self._checkpoint_file:
             return
         p = Path(self._checkpoint_file)
         p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(p.suffix + ".tmp")
         try:
-            with p.open("w", encoding="utf-8") as fh:
-                json.dump(sorted(completed_ids), fh, indent=2)
+            with tmp.open("w", encoding="utf-8") as fh:
+                json.dump({"schema": self.CHECKPOINT_SCHEMA, "jobs": self._jobs}, fh,
+                          indent=2, sort_keys=True)
+            os.replace(tmp, p)
         except Exception as exc:  # pylint: disable=broad-except
             logger.error("Failed to save checkpoint: %s", exc)
 
+    def save_checkpoint(self, completed_ids: List[str]) -> None:
+        """Record *completed_ids* as completed (kept for API compatibility)."""
+        by_id = {c.scene_id: c for c in self._configs}
+        for sid in completed_ids:
+            entry = self._jobs.setdefault(sid, {})
+            entry["status"] = "completed"
+            if sid in by_id:
+                entry["fingerprint"] = self.fingerprint(by_id[sid])
+            entry["updated_at"] = _now()
+        self._write_checkpoint()
+
     # ------------------------------------------------------------------
     def mark_complete(self, scene_id: str) -> None:
-        """Record *scene_id* as completed and persist the checkpoint."""
-        self._completed_ids.add(scene_id)
-        self.save_checkpoint(list(self._completed_ids))
+        self._set_status(scene_id, "completed", "")
+
+    def mark_failed(self, scene_id: str, reason: str) -> None:
+        self._set_status(scene_id, "failed", reason)
+
+    def _set_status(self, scene_id: str, status: str, reason: str) -> None:
+        by_id = {c.scene_id: c for c in self._configs}
+        fp = self.fingerprint(by_id[scene_id]) if scene_id in by_id else None
+        self._jobs[scene_id] = {"fingerprint": fp, "status": status, "reason": reason,
+                                "updated_at": _now()}
+        if self._skip is not None:
+            self._skip.pop(scene_id, None)
+        self._write_checkpoint()
 
     # ------------------------------------------------------------------
+    def _decide(self) -> Dict[str, str]:
+        """Compute which jobs are already done (verified)."""
+        from simulator.scene_io import verify_scene_output
+        skip: Dict[str, str] = {}
+        for cfg in self._configs:
+            sid = cfg.scene_id
+            job = self._jobs.get(sid)
+            fp = self.fingerprint(cfg)
+            if job is not None:
+                if job.get("status") != "completed":
+                    self.decisions[sid] = f"rerun:previous_{job.get('status')}"
+                    continue
+                if job.get("fingerprint") != fp:
+                    self.decisions[sid] = "rerun:fingerprint_changed"
+                    continue
+            elif sid not in self._legacy_ids:
+                self.decisions[sid] = "run:new"
+                continue
+            if self._verify == "none" and job is not None:
+                skip[sid] = "checkpoint"
+                self.decisions[sid] = "skip:checkpoint"
+                continue
+            ok, why = verify_scene_output(
+                cfg.output_dir, sid, expected_fingerprint=fp,
+                mode="checksum" if self._verify == "checksum" else "exists",
+            )
+            if ok:
+                skip[sid] = "verified"
+                self.decisions[sid] = "skip:verified"
+            else:
+                self.decisions[sid] = f"rerun:{why}"
+        return skip
+
     @property
     def pending_count(self) -> int:
-        """Number of configs not yet completed."""
-        return sum(
-            1 for cfg in self._configs if cfg.scene_id not in self._completed_ids
-        )
+        """Number of configs that will be (re)run."""
+        return sum(1 for _ in self)
 
-    # ------------------------------------------------------------------
     def __iter__(self):
-        """Yield pending SceneConfig objects (skip already completed)."""
+        """Yield pending SceneConfig objects (skip verified completed jobs)."""
+        if self._skip is None:
+            self._skip = self._decide()
         for cfg in self._configs:
-            if cfg.scene_id not in self._completed_ids:
+            if cfg.scene_id not in self._skip:
                 yield cfg
+
+    @property
+    def skipped_ids(self) -> List[str]:
+        if self._skip is None:
+            self._skip = self._decide()
+        return sorted(self._skip)
+
+    def duplicate_groups(self) -> List[List[str]]:
+        """Scene IDs that share a render fingerprint (same job under different IDs)."""
+        groups: Dict[str, List[str]] = {}
+        for cfg in self._configs:
+            groups.setdefault(self.fingerprint(cfg), []).append(cfg.scene_id)
+        return [sorted(v) for v in groups.values() if len(v) > 1]
 
     def __len__(self) -> int:
         return len(self._configs)
+
+
+def _now() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def classify_failure(exc: BaseException) -> str:
+    """Map an exception to a checkpoint/summary reason string."""
+    from simulator.scene_io import SceneQCError, UnsupportedProfileError
+    from simulator.uf.w151_config import ValidationError
+    if isinstance(exc, SceneQCError):
+        return f"qc:{exc.check}"
+    if isinstance(exc, UnsupportedProfileError):
+        return "unsupported_profile"
+    if isinstance(exc, ValidationError):
+        return "validation"
+    return f"error:{type(exc).__name__}"
 
 
 # ---------------------------------------------------------------------------
@@ -173,13 +297,16 @@ _SIMULATE_FN: Optional[Callable] = None
 
 
 def _worker_fn(config: SceneConfig):
-    """Executed in a worker process. Returns (scene_id, result_dict, None) on
-    success, or (scene_id, None, error_str) on failure."""
+    """Executed in a worker process.
+
+    Returns (scene_id, result_dict, None, "") on success, or
+    (scene_id, None, error_str, reason) on failure.
+    """
     try:
         result = _SIMULATE_FN(config)
-        return (config.scene_id, result, None)
+        return (config.scene_id, result, None, "")
     except Exception as exc:  # pylint: disable=broad-except
-        return (config.scene_id, None, str(exc))
+        return (config.scene_id, None, str(exc), classify_failure(exc))
 
 
 def _init_worker(simulate_fn: Callable) -> None:
@@ -221,78 +348,90 @@ class BatchExecutor:
     def run(self) -> ExecutionSummary:
         """Execute all pending jobs and return an ExecutionSummary.
 
-        - Uses multiprocessing.Pool for parallelism.
-        - Per-job exceptions are logged but do NOT halt the batch.
-        - Checkpoint is saved after every completed job.
-        - Tracks elapsed time and computes throughput.
+        - ``worker_count == 1`` runs sequentially in-process; otherwise a
+          multiprocessing.Pool is used.
+        - Per-job exceptions are recorded with a reason and do NOT halt the batch.
+        - The checkpoint is updated after every job (completed or failed).
         """
         import multiprocessing
 
         Path(self._output_dir).mkdir(parents=True, exist_ok=True)
 
-        pending = list(self._queue)  # snapshot
-        n_total = len(self._queue)  # includes already-completed
+        pending = list(self._queue)  # snapshot (verifies previous outputs)
+        n_total = len(self._queue)
         n_pending = len(pending)
+        skipped = self._queue.skipped_ids
+        dup_groups = self._queue.duplicate_groups()
+        for g in dup_groups:
+            logger.warning("Scenes share one render fingerprint: %s", g)
 
         logger.info(
-            "BatchExecutor starting: %d pending / %d total, workers=%d",
-            n_pending,
-            n_total,
-            self._worker_count,
+            "BatchExecutor starting: %d pending / %d total (%d verified skip), workers=%d",
+            n_pending, n_total, len(skipped), self._worker_count,
         )
 
         n_completed = 0
-        n_failed = 0
         failed_ids: List[str] = []
+        reasons: Dict[str, str] = {}
+        audio_s = 0.0
+        qc_audio_s = 0.0
+        bytes_written = 0
+
+        def _handle(scene_id, result, error, reason):
+            nonlocal n_completed, audio_s, qc_audio_s, bytes_written
+            if error is not None:
+                failed_ids.append(scene_id)
+                reasons[scene_id] = reason
+                self._queue.mark_failed(scene_id, reason)
+                logger.error("Scene %s FAILED (%s): %s", scene_id, reason, error)
+                return
+            n_completed += 1
+            self._queue.mark_complete(scene_id)
+            if isinstance(result, dict):
+                dur = float(result.get("audio_duration_s", 0.0) or 0.0)
+                audio_s += dur
+                if (result.get("qc") or {}).get("passed", False):
+                    qc_audio_s += dur
+                bytes_written += int(result.get("bytes_written", 0) or 0)
 
         t_start = time.monotonic()
-
         if n_pending == 0:
             logger.info("No pending jobs.")
+        elif self._worker_count == 1:
+            _init_worker(self._simulate_fn)
+            for cfg in pending:
+                _handle(*_worker_fn(cfg))
         else:
             with multiprocessing.Pool(
-                processes=self._worker_count,
+                processes=min(self._worker_count, n_pending),
                 initializer=_init_worker,
                 initargs=(self._simulate_fn,),
             ) as pool:
-                # imap_unordered gives results as they complete → good for
-                # checkpointing and progress logging.
-                for scene_id, result, error in pool.imap_unordered(
-                    _worker_fn, pending
-                ):
-                    if error is not None:
-                        n_failed += 1
-                        failed_ids.append(scene_id)
-                        logger.error(
-                            "Scene %s FAILED: %s", scene_id, error
-                        )
-                    else:
-                        n_completed += 1
-                        self._queue.mark_complete(scene_id)
-                        logger.debug("Scene %s completed.", scene_id)
+                for item in pool.imap_unordered(_worker_fn, pending):
+                    _handle(*item)
 
         elapsed = time.monotonic() - t_start
-        # Add scenes that were already complete before this run
-        already_done = n_total - n_pending
-        total_done = n_completed + already_done
-
+        total_done = n_completed + len(skipped)
         throughput = (n_completed / elapsed * 3600.0) if elapsed > 0 else float("inf")
+        qc_rate = (qc_audio_s / 3600.0) / (elapsed / 3600.0) if elapsed > 0 else 0.0
 
         summary = ExecutionSummary(
             n_completed=total_done,
-            n_failed=n_failed,
+            n_failed=len(failed_ids),
             n_total=n_total,
             elapsed_s=elapsed,
             throughput_scenes_per_hour=throughput,
             failed_scene_ids=failed_ids,
+            n_skipped=len(skipped),
+            failure_reasons=reasons,
+            audio_seconds_completed=audio_s,
+            bytes_written=bytes_written,
+            qc_passed_audio_hours_per_hour=qc_rate,
+            duplicate_groups=dup_groups,
         )
-
         logger.info(
-            "Batch done: %d completed, %d failed, %.2f s, %.1f scenes/h",
-            total_done,
-            n_failed,
-            elapsed,
-            throughput,
+            "Batch done: %d completed (%d skipped), %d failed, %.2f s, %.1f scenes/h",
+            total_done, len(skipped), len(failed_ids), elapsed, throughput,
         )
         return summary
 
@@ -308,6 +447,7 @@ def run_batch(
     output_dir: str,
     simulate_fn: Callable,
     checkpoint_file: Optional[str] = None,
+    verify: str = "checksum",
 ) -> ExecutionSummary:
     """High-level entry point combining JobQueue + BatchExecutor.
 
@@ -321,7 +461,7 @@ def run_batch(
     Returns:
         ExecutionSummary with completion stats.
     """
-    queue = JobQueue(configs, checkpoint_file=checkpoint_file)
+    queue = JobQueue(configs, checkpoint_file=checkpoint_file, verify=verify)
     executor = BatchExecutor(
         job_queue=queue,
         worker_count=worker_count,
@@ -335,6 +475,12 @@ def run_batch(
 # Smoke test
 # ---------------------------------------------------------------------------
 
+def _fake_simulate(cfg: SceneConfig) -> dict:
+    """Smoke-test simulate_fn.  Module level so spawned workers can import it."""
+    time.sleep(0.01)
+    return {"scene_id": cfg.scene_id, "status": "ok"}
+
+
 if __name__ == "__main__":
     import tempfile
     import os
@@ -345,11 +491,6 @@ if __name__ == "__main__":
     # Build minimal SceneConfig objects
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
     from simulator.types import SceneConfig  # noqa: F811
-
-    def _fake_simulate(cfg: SceneConfig) -> dict:
-        # Simulate a tiny amount of work
-        time.sleep(0.01)
-        return {"scene_id": cfg.scene_id, "status": "ok"}
 
     cfgs = [
         SceneConfig(
@@ -367,7 +508,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmpdir:
         ckpt = os.path.join(tmpdir, "ckpt.json")
         summary = run_batch(cfgs, worker_count=2, output_dir=tmpdir,
-                            simulate_fn=_fake_simulate, checkpoint_file=ckpt)
+                            simulate_fn=_fake_simulate, checkpoint_file=ckpt, verify="none")
         print(f"  n_completed : {summary.n_completed}")
         print(f"  n_failed    : {summary.n_failed}")
         print(f"  elapsed_s   : {summary.elapsed_s:.3f}")

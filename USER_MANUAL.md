@@ -705,43 +705,65 @@ ism_order: 3
 
 ## 7. 출력 파일 구조
 
+> 2026-11-21 변경: 감사 개선 설계([W1_audit_remediation_design.md](design_md/W100000/W1_audit_remediation_design.md))에 따라 파일 이름, 인코딩, 매니페스트 스키마가 바뀌었다. 이전 `receiver_*.wav`, `source_*_clean.wav`, `rir_{src}_{rec}.wav`는 더 이상 만들지 않는다.
+
 ```
 output/
-└── zoom_meeting_4p/                 ← {output_dir}/{scene_id}/
-    ├── scene_manifest.json          ← 전체 메타데이터
-    ├── receiver_conf_mic.wav        ← 수신기 오디오 (16bit PCM)
-    ├── source_person_0_ref.wav      ← 음원 기준 신호 (화이트 노이즈)
-    ├── source_person_1_ref.wav
-    ├── rir_person_0_conf_mic.wav    ← RIR (person_0 → conf_mic)
-    ├── rir_person_1_conf_mic.wav
-    ├── rir_person_2_conf_mic.wav
-    ├── rir_person_3_conf_mic.wav
-    └── params.json                  ← 씬 파라미터 상세
+├── batch_checkpoint.json            ← 배치 재개 정보 (schema 2, 작업 지문 포함)
+├── _quarantine/<scene_id>/          ← QC 실패 씬 (qc_failure.json에 이유)
+└── zoom_meeting_4p/                 ← {output_dir}/{scene_id}/  (QC 통과 후 원자적으로 확정)
+    ├── scene_manifest.json          ← schema 2.0.0 메타데이터
+    ├── mixture__conf_mic.wav        ← 관측 혼합음 (수음 체인 적용 후)
+    ├── noise__conf_mic.wav          ← 혼합음에 더해진 장치 잡음
+    ├── reference__person_0__conf_mic.wav  ← 분리 정답: 마이크 위치의 음원 이미지 (장치 열화 전)
+    ├── dry__person_0.wav            ← 씬 타임라인에 놓인 건조 신호
+    ├── rir__person_0__conf_mic.wav  ← RIR
+    ├── params.json                  ← 해석된(기본값이 채워진) 설정
+    └── acoustic_summary.json
 ```
 
-### scene_manifest.json 구조
+* 모든 WAV는 **IEEE float32**다. `scipy.io.wavfile.read`, `soundfile.read`로 읽는다(표준 `wave` 모듈은 float WAV를 읽지 못한다).
+* 혼합음·참조·잡음은 같은 샘플 격자를 쓴다. 인덱스 0이 씬 시작이고, 길이 `T = round(duration_s·fs) + RIR 길이 − 1`이다(`render.tail: "trim"`이면 `duration_s·fs`).
+* 장치 열화 전에는 `Σ reference == mixture − noise`가 성립한다(클리핑·코덱이 없을 때).
+* 매니페스트의 경로는 **출력 루트 기준 상대 경로**(`<scene_id>/<file>`)다. 폴더를 옮겨도 그대로 읽힌다.
 
-```json
-{
-  "schema_version": "1.0",
-  "scene_id": "zoom_meeting_4p",
-  "seed": 42,
-  "created_at": "2026-03-23T10:00:00",
-  "room": { "type": "shoebox", "dimensions": { "L": 6.0, "W": 4.0, "H": 2.8 } },
-  "acoustic_summary": {
-    "rt60_measured_s": 0.38,
-    "drr_db": 6.5,
-    "snr_db": 38.2,
-    "doa_az_deg": 45.0,
-    "doa_el_deg": -5.0
-  },
-  "audio_files": ["output/zoom_meeting_4p/receiver_conf_mic.wav"],
-  "rir_files": [
-    "output/zoom_meeting_4p/rir_person_0_conf_mic.wav",
-    "output/zoom_meeting_4p/rir_person_1_conf_mic.wav"
-  ]
-}
+### scene_manifest.json 주요 필드 (schema 2.0.0)
+
+| 필드 | 내용 |
+| --- | --- |
+| `fingerprint` | 작업 지문. 표시 ID·출력 폴더와 무관하고, 시드·기하·장치·입력 파일 해시가 바뀌면 달라진다 |
+| `render` | `profile`(static_v1), `fs`, `n_samples`, `reference_receiver`, `approximations` |
+| `sources[]` | `onset_sample`, `n_samples`, `truncated`, 신호 출처(`kind`, `sha256`, `resampled_from`) |
+| `receivers[]` | 명목·유효 좌표, `clock_shift_samples`, 장치 파라미터 |
+| `geometry.pairs[]` | 쌍별 거리, 직접파 지연, DOA, 도달 구간, RT60/DRR |
+| `labels` | 기준 채널의 활성 구간, `overlap_ratio`, 음원별 `snr_db`와 정의 |
+| `files[]` | 경로, 역할, 샘플 수, `sha256`, 바이트 수 |
+| `qc` | `passed`, 검사별 결과, 플래그(클리핑·헤드룸 등) |
+| `audio_files`, `rir_files`, `acoustic_summary` | v1 호환 필드 |
+
+### 학습 코드에서 읽기
+
+```python
+import sys; sys.path.insert(0, "src")
+from datatools.loader import load_scene
+b = load_scene("output/zoom_meeting_4p/scene_manifest.json")   # 체크섬·모양·QC 검증
+b.mixture      # float32 [C, T]
+b.references   # float32 [S, C, T]
+b.noise        # float32 [C, T]
 ```
+
+### 새 설정 필드 (선택)
+
+| 위치 | 필드 | 설명 |
+| --- | --- | --- |
+| `sources[i]` | `signal_path`, `onset_s`, `level_dbfs` | 건조 음성 WAV(다른 샘플레이트는 자동 변환), 시작 시각, 활성 RMS 레벨 |
+| `receivers[i]` | `gain_db`, `noise_floor_dbfs`, `clip_threshold_dbfs`, `sensitivity_db` | **채널별** 장치 파라미터 |
+| `impairments.array_errors` | `position_sigma_m`, `max_clock_skew_samples` | 전파 전 위치 오차, 채널 시계 시프트 |
+| `render` | `tail`, `allow_static_approximation` | 잔향 꼬리 유지/자르기, 이동 엔터티를 첫 틱으로 근사 |
+| `qc` | `fail_on_clip` | 클리핑을 실패로 처리 |
+| 최상위 | `reference_receiver` | 라벨·SNR 기준 채널 (기본: 첫 수음기) |
+
+지원 범위는 `static_v1`이다. 이동 음원·수음기, `omni`가 아닌 지향성, 바이노럴은 렌더 전에 `UnsupportedProfileError`로 거부한다. ID는 영문·숫자·`.`·`-`·단일 `_`만 쓸 수 있고 씬 안에서 고유해야 한다.
 
 ---
 

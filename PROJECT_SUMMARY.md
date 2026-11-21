@@ -162,6 +162,15 @@ SceneConfig (JSON/YAML)
 | **BUG-03** | ISM order=1일 때 26개 소스 반환 (정답: 6개) | `abs(nx)+abs(ny)+abs(nz) > ism_order` 필터 추가 |
 | **BUG-04** | Gradio 6.0에서 `theme` 파라미터 위치 변경 | `Blocks()` → `launch()` 인자로 이동 |
 | **BUG-05** | `pip install -e .` 실패: `setuptools.backends.legacy` 없음 | build-backend를 `setuptools.build_meta`로 변경 |
+| **BUG-06** | `generate_rir()`가 지원되지 않는 `src_pos` 인자 전달 → 모든 씬 실행 중단 (감사 F-01) | 인자 제거, 정적 RIR 구현 단일화 |
+| **BUG-07** | 후기 잔향 크기 규칙 때문에 RT60이 짧으면 피크가 꼬리로 이동, 꼬리 길이 0이면 NaN | 혼합 시각에서 에너지 연속이 되도록 크기 결정 |
+| **BUG-08** | ISM 홀수 차수 이미지 좌표가 원점 중심 방을 가정 → 1차 반사가 직접파보다 먼저 도달 | `(n+1)·L − x`로 수정 |
+| **BUG-09** | 설정 `position` 무시(무작위 배치), 궤적 ID가 `source_0`/`receiver_0`로 고정 → 출력이 잡음뿐 | 위치 주입, 설정 ID 전달 |
+| **BUG-10** | 재질 맵이 씬 상태에 전달되지 않음, 모든 쌍이 같은 잔향 시드 | 재질 전달, 쌍별 시드 |
+| **BUG-11** | WAV를 PCM int32로 표시해 float 값이 재해석됨 | IEEE float32 WAV |
+| **BUG-12** | 채널별 이득 무시, 배열 오차 미적용, 재개 시 ID만 비교, GUI 왕복에서 음원·장애물·ID 손실 | 감사 개선 설계 §4 참조 |
+
+감사(2026-11-20)와 개선 설계는 [review_docs/261120_1716_fresh_eyes_audit.md](review_docs/261120_1716_fresh_eyes_audit.md), [design_md/W100000/W1_audit_remediation_design.md](design_md/W100000/W1_audit_remediation_design.md)에 있다.
 
 ### 5-2. 잔존 STUB (다음 버전 과제)
 

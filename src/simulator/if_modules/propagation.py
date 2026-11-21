@@ -8,6 +8,7 @@ from __future__ import annotations
 import sys
 import os
 import warnings
+import zlib
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -43,11 +44,17 @@ class AcousticPropagationEngine:
         fs: int = 16000,
         c: float = SPEED_OF_SOUND,
         ism_order: int = 3,
+        seed: int = 0,
     ) -> None:
         self.fs = fs
         self.c = c
         self.ism_order = ism_order
-        self._rir_cache: Dict[Tuple[str, str], RIR] = {}
+        self.seed = int(seed)
+        self._rir_cache: Dict[Tuple[str, str, int], RIR] = {}
+
+    def pair_seed(self, src_id: str, rec_id: str) -> int:
+        """Deterministic late-reverb seed, distinct per (scene seed, source, receiver)."""
+        return zlib.crc32(f"{self.seed}:{src_id}:{rec_id}".encode("utf-8")) & 0x7FFFFFFF
 
     # ------------------------------------------------------------------
     # Per-pair computations
@@ -97,7 +104,7 @@ class AcousticPropagationEngine:
         late_spec = LateReverbSpec(
             rt60_s=rt60_est,
             mixing_time_ms=mixing_time_ms,
-            seed=42,
+            seed=self.pair_seed(src_id, rec_id),
         )
         return ReflectionData(image_sources=image_sources, late_tail_spec=late_spec)
 
@@ -131,14 +138,12 @@ class AcousticPropagationEngine:
         occlusion = self.compute_occlusion(scene_state, src_id, rec_id)
 
         rec = self._get_receiver(scene_state, rec_id)
-        src = self._get_source(scene_state, src_id)
 
         rir = generate_static_rir_with_mic(
             direct_path=direct,
             reflection_data=reflections,
             occlusion_result=occlusion,
             mic_pos=rec.position,
-            src_pos=src.position,
             fs=self.fs,
             c=self.c,
         )
@@ -237,6 +242,7 @@ def process_scene(
     source_signals: Dict[str, np.ndarray],
     fs: int = 16000,
     ism_order: int = 3,
+    seed: int = 0,
 ) -> Dict[str, np.ndarray]:
     """One-call render: scene_state + dry signals → observed signals per receiver.
 
@@ -249,5 +255,5 @@ def process_scene(
     Returns:
         {receiver_id: float32[N_out]}
     """
-    engine = AcousticPropagationEngine(fs=fs, ism_order=ism_order)
+    engine = AcousticPropagationEngine(fs=fs, ism_order=ism_order, seed=seed)
     return engine.render_scene(scene_state, source_signals)

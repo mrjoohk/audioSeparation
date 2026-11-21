@@ -48,15 +48,19 @@ _BUTTERWORTH_ORDER: int = 4
 def _reflect_coord(n: int, src: float, size: float) -> float:
     """Return the 1-D image coordinate for index n along one axis.
 
-    Allen-Berkley formulation:
+    Allen-Berkley formulation for a room spanning [0, size]:
         even n :  n * size + src
-        odd  n :  n * size - src      (mirror)
-    This is equivalent to reflecting src_pos across n room-boundaries.
+        odd  n :  (n + 1) * size - src      (mirror)
+    n = +1 reflects across the wall at ``size`` (2*size - src); n = -1 reflects
+    across the wall at 0 (-src).  This matches ``_wall_hits`` (n > 0 hits the
+    "+" wall first) and the room primitive, whose AABB is [0, L]x[0, H]x[0, W].
+    (The former odd-n formula ``n*size - src`` assumed a room centred on the
+    origin and could place a first-order image closer than the direct path.)
     """
     if n % 2 == 0:
         return n * size + src
     else:
-        return n * size - src
+        return (n + 1) * size - src
 
 
 def compute_image_sources(

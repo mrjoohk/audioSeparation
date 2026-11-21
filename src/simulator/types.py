@@ -27,6 +27,8 @@ MAX_MIC_CHANNELS: int = 64
 MAX_RIR_DURATION_S: float = 4.0
 MIN_SOURCE_MIC_DIST_M: float = 0.1
 MAX_SOURCE_MIC_DIST_M: float = 25.0
+DEFAULT_DURATION_S: float = 5.0          # single scene-length default (render + trajectories)
+DEFAULT_TICK_RATE_HZ: float = 50.0
 
 # ---------------------------------------------------------------------------
 # Room / Geometry Types
@@ -373,6 +375,7 @@ class SceneConfig:
     sample_rate: int = 16000
     ism_order: int = 3
     speed_of_sound: float = SPEED_OF_SOUND
+    extras: dict = field(default_factory=dict)  # render / qc / reference_receiver
 
 
 @dataclass
@@ -396,6 +399,13 @@ class ExecutionSummary:
     elapsed_s: float
     throughput_scenes_per_hour: float
     failed_scene_ids: List[str] = field(default_factory=list)
+    # --- resume / pilot metrics (design §4.5, F-08, F-11) ---
+    n_skipped: int = 0                       # verified outputs reused from a previous run
+    failure_reasons: Dict[str, str] = field(default_factory=dict)  # scene_id -> reason
+    audio_seconds_completed: float = 0.0     # rendered audio (per channel) in this run
+    bytes_written: int = 0
+    qc_passed_audio_hours_per_hour: float = 0.0
+    duplicate_groups: List[List[str]] = field(default_factory=list)  # same fingerprint
 
 
 # ---------------------------------------------------------------------------

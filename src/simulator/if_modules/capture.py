@@ -48,6 +48,8 @@ class CaptureDeviceChain:
         self.seed = seed
         self.fs = config.sample_rate
         self._seeds = derive_subsystem_seeds(seed, ["noise", "codec", "array"])
+        self.last_noise_component: Optional[np.ndarray] = None
+        self.last_noise_pregain: Optional[np.ndarray] = None
 
     # ------------------------------------------------------------------
     # Stage: microphone responses
@@ -123,47 +125,82 @@ class CaptureDeviceChain:
     # Stage: noise and gain
     # ------------------------------------------------------------------
 
+    def _receiver_device_params(self, c: int) -> dict:
+        """Device parameters for channel ``c`` (falls back to defaults).
+
+        Each receiver dict may carry ``noise_floor_dbfs``, ``gain_db``,
+        ``clip_threshold_dbfs`` and ``agc_enabled``.  Previously only
+        ``receivers[0]`` was read, so per-channel settings were ignored.
+        """
+        params = {
+            "noise_floor_dbfs": -60.0,
+            "gain_db": 0.0,
+            "clip_threshold_dbfs": 0.0,
+            "agc_enabled": False,
+        }
+        recs = self.config.receivers or []
+        if c < len(recs):
+            rec = recs[c]
+            for k in params:
+                if k in rec and rec[k] is not None:
+                    params[k] = type(params[k])(rec[k])
+        return params
+
+    def apply_noise_gain_components(
+        self,
+        signals: np.ndarray,   # float32[C×N]
+    ) -> Tuple[np.ndarray, List[float], np.ndarray, List[int]]:
+        """Self-noise → gain/AGC → clipping, per channel, exposing the noise.
+
+        Returns:
+            (degraded float32[C×N], snr_per_channel_db, noise float32[C×N]
+             scaled by the same gain as the signal, clipped_samples_per_channel)
+        """
+        noise_seed = self._seeds.get("noise", self.seed)
+        C, N = signals.shape
+        out = np.zeros_like(signals, dtype=np.float32)
+        noise_out = np.zeros_like(signals, dtype=np.float32)
+        noise_pre = np.zeros_like(signals, dtype=np.float32)
+        snr_list: List[float] = []
+        clipped: List[int] = []
+
+        for c in range(C):
+            prm = self._receiver_device_params(c)
+            clean = np.asarray(signals[c], dtype=np.float32)
+            noisy, snr = add_self_noise(
+                clean, prm["noise_floor_dbfs"], self.fs,
+                seed=(noise_seed + c) & 0x7FFFFFFF,
+            )
+            noise = (noisy.astype(np.float64) - clean.astype(np.float64))
+            if prm["agc_enabled"]:
+                gained = apply_gain_agc(noisy, prm["gain_db"], agc_enabled=True)
+                rms_in = float(np.sqrt(np.mean(noisy.astype(np.float64) ** 2)) + 1e-30)
+                rms_out = float(np.sqrt(np.mean(gained.astype(np.float64) ** 2)))
+                g_lin = rms_out / rms_in
+            else:
+                gained = apply_gain_agc(noisy, prm["gain_db"])
+                g_lin = float(apply_gain_agc(np.ones(1, np.float32), prm["gain_db"])[0])
+            ch, _, n_clip = apply_clipping(gained, prm["clip_threshold_dbfs"])
+            out[c] = ch
+            noise_out[c] = (noise * g_lin).astype(np.float32)
+            noise_pre[c] = noise.astype(np.float32)
+            snr_list.append(float(snr))
+            clipped.append(int(n_clip))
+
+        self.last_noise_pregain = noise_pre
+        return out, snr_list, noise_out, clipped
+
     def apply_noise_gain(
         self,
         signals: np.ndarray,   # float32[C×N]
     ) -> Tuple[np.ndarray, List[float]]:
-        """Apply self-noise, gain, and optional AGC/clipping.
-
-        Noise and gain parameters are read from config.receivers[0] if present,
-        otherwise defaults are used.
+        """Apply self-noise, gain, and clipping with per-channel parameters.
 
         Returns:
             (degraded_signals: float32[C×N], snr_per_channel: List[float])
         """
-        noise_seed = self._seeds.get("noise", self.seed)
-        C, N = signals.shape
-
-        # Default noise/gain parameters
-        noise_floor = -60.0   # dBFS
-        gain_db = 0.0
-        clip_threshold = 0.0  # dBFS
-
-        # Try to read from config
-        if self.config.receivers:
-            rec0 = self.config.receivers[0]
-            noise_floor = float(rec0.get("noise_floor_dbfs", noise_floor))
-            gain_db = float(rec0.get("gain_db", gain_db))
-            clip_threshold = float(rec0.get("clip_threshold_dbfs", clip_threshold))
-
-        out = np.zeros_like(signals)
-        snr_list: List[float] = []
-
-        for c in range(C):
-            ch, snr = add_self_noise(
-                signals[c], noise_floor, self.fs,
-                seed=(noise_seed + c) & 0x7FFFFFFF,
-            )
-            ch = apply_gain_agc(ch, gain_db)
-            ch, _, _ = apply_clipping(ch, clip_threshold)
-            out[c] = ch
-            snr_list.append(snr)
-
-        return out.astype(np.float32), snr_list
+        out, snr_list, _, _ = self.apply_noise_gain_components(signals)
+        return out, snr_list
 
     # ------------------------------------------------------------------
     # Stage: codec / channel impairments
@@ -208,6 +245,7 @@ class CaptureDeviceChain:
                     packet_error_rate=spec.packet_error_rate,
                     segment_duration_ms=spec.segment_duration_ms or 20.0,
                     seed=(codec_seed + c) & 0x7FFFFFFF,
+                    allow_stress=bool(imp_cfg.get("allow_stress", False)),
                 )
                 metadata["n_dropped_segments"] = n_dropped
                 metadata["total_segments"] = total
@@ -261,13 +299,16 @@ class CaptureDeviceChain:
                 if updated_array.clock_skew_samples is not None else []
             )
 
-        # Stage 3: noise and gain
-        sig, snr_list = self.apply_noise_gain(sig)
+        # Stage 3: noise and gain (per channel)
+        sig, snr_list, noise, clipped = self.apply_noise_gain_components(sig)
         metadata["snr_per_channel_db"] = snr_list
+        metadata["clipped_samples"] = clipped
+        self.last_noise_component = noise
 
         # Stage 4: impairments
         sig, imp_meta = self.apply_impairments(sig)
         metadata["impairment"] = imp_meta
+        metadata["nonlinear_applied"] = bool(sum(clipped) > 0 or imp_meta.get("applied"))
 
         return sig, metadata
 

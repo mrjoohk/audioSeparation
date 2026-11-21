@@ -39,7 +39,8 @@ def add_self_noise(
     """
     Add broadband self-noise at the specified noise floor level.
 
-    noise_power = 10^(noise_floor_dbfs / 10)  (relative to 0 dBFS = amplitude 1.0)
+    dBFS follows AES17: a full-scale sine (peak 1.0, RMS 1/sqrt(2)) is 0 dBFS.
+    noise_power = 10^(noise_floor_dbfs / 10) / 2
     noise = rng.standard_normal(len(signal)) * sqrt(noise_power)
     noisy = signal + noise
     snr_db = 10*log10(mean(signal²) / mean(noise²))
@@ -73,8 +74,8 @@ def add_self_noise(
 
     rng = np.random.default_rng(seed)
 
-    # Noise power relative to 0 dBFS (amplitude 1.0 → power 1.0)
-    noise_power = 10.0 ** (noise_floor_dbfs / 10.0)
+    # Noise power relative to 0 dBFS (AES17: full-scale sine RMS = 1/sqrt(2))
+    noise_power = 10.0 ** (noise_floor_dbfs / 10.0) / 2.0
     noise = (rng.standard_normal(len(signal)) * math.sqrt(noise_power)).astype(np.float32)
 
     noisy = signal + noise
