@@ -1,0 +1,87 @@
+{
+ "means_si_sdri_db": {
+  "room_A": {
+   "baseline_roomA": 2.786638451396778,
+   "robust": 4.230041209871246
+  },
+  "room_B": {
+   "baseline_roomA": 2.750685298046671,
+   "robust": 3.3638374976455983
+  },
+  "circular3_r3": {
+   "baseline_roomA": 3.3688549406268904,
+   "robust": 4.970035814633565
+  },
+  "linear3_4cm": {
+   "baseline_roomA": 2.150691658196491,
+   "robust": 4.205710279972054
+  },
+  "square4_8cm": {
+   "baseline_roomA": 2.1035415644598956,
+   "robust": 3.4446429192207804
+  }
+ },
+ "paired_robust_vs_baseline": {
+  "room_A": {
+   "n": 30,
+   "mean_diff": 1.4434027584744669,
+   "ci95": [
+    0.41417937552070877,
+    2.489916232986441
+   ]
+  },
+  "room_B": {
+   "n": 30,
+   "mean_diff": 0.6131521995989263,
+   "ci95": [
+    0.07196966759510258,
+    1.156724210156977
+   ]
+  },
+  "circular3_r3": {
+   "n": 30,
+   "mean_diff": 1.6011808740066755,
+   "ci95": [
+    0.47837912197529003,
+    2.7230789868365313
+   ]
+  },
+  "linear3_4cm": {
+   "n": 30,
+   "mean_diff": 2.0550186217755626,
+   "ci95": [
+    1.1344268046821648,
+    3.047509785020443
+   ]
+  },
+  "square4_8cm": {
+   "n": 30,
+   "mean_diff": 1.3411013547608845,
+   "ci95": [
+    0.6151759863450843,
+    2.169863914626989
+   ]
+  }
+ },
+ "room_B_gain_db": 0.6131521995989271,
+ "req303_gain_ge_1_5db": false,
+ "held_out_arrays": {
+  "circular3_r3": {
+   "baseline_drop_db": -0.5822164892301123,
+   "robust_drop_db": -0.7399946047623196,
+   "halved": true
+  },
+  "linear3_4cm": {
+   "baseline_drop_db": 0.6359467932002869,
+   "robust_drop_db": 0.02433092989919139,
+   "halved": true
+  },
+  "square4_8cm": {
+   "baseline_drop_db": 0.6830968869368825,
+   "robust_drop_db": 0.7853982906504653,
+   "halved": false
+  }
+ },
+ "req303_all_arrays_halved": false,
+ "note": "synthetic stand-in assets; not real speech"
+}

@@ -1,0 +1,79 @@
+{
+ "fixed_at": "2026-11-23T11:50:11",
+ "fixed_before": [
+  "v3 training",
+  "any blind3 scene build or evaluation"
+ ],
+ "design": "design_md/W100000/W1_audit_remediation_design.md section 16",
+ "ami_train_meetings": [
+  "ES2004a",
+  "ES2004b",
+  "ES2004c",
+  "ES2004d",
+  "ES2014a",
+  "ES2014b",
+  "ES2014c",
+  "ES2014d",
+  "IS1003a",
+  "IS1003c",
+  "IS1003d",
+  "IS1006a",
+  "IS1006b",
+  "IS1006c",
+  "IS1006d",
+  "IS1007a"
+ ],
+ "ami_train_scenes_per_meeting": 80,
+ "ami_train_seed": 300,
+ "ami_train_channels": [
+  0,
+  1,
+  7
+ ],
+ "models": {
+  "v3-mix": {
+   "real_fraction": 0.5,
+   "synthetic": "train_robust_v2"
+  },
+  "v3-real": {
+   "real_fraction": 1.0
+  }
+ },
+ "train": {
+  "steps": 30000,
+  "batch": 16,
+  "seg_s": 4.0,
+  "augment": true,
+  "init": "scratch"
+ },
+ "candidate_rule": "max AMI dev mean SI-SDRi among v3-mix, v3-real",
+ "baseline": "v2-base",
+ "blind3_meetings": [
+  "TS3009a",
+  "TS3009b",
+  "TS3009c",
+  "TS3009d",
+  "TS3010a",
+  "TS3010b",
+  "TS3010c",
+  "TS3010d",
+  "TS3011a",
+  "TS3011b",
+  "TS3011c",
+  "TS3011d",
+  "TS3012a",
+  "TS3012b",
+  "TS3012c",
+  "TS3012d"
+ ],
+ "blind3_scenes_per_meeting": 40,
+ "blind3_seed": 100,
+ "verdict": {
+  "REQ-303": "cand - base SI-SDRi >= +1.5 dB (judged with 16 sessions)",
+  "REQ-305": "cand - base WER <= -3.0 pp and session CI upper < 0; withheld under 20 sessions",
+  "REQ-402": "WER relative <= -15 % and DER <= -5.0 pp vs unprocessed; withheld under 20 sessions",
+  "min_sessions_wer_der": 20
+ },
+ "asr": "Whisper small.en, word timestamps; primary WER un-gated, gated WER secondary",
+ "openings_allowed": 1
+}

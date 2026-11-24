@@ -1,0 +1,100 @@
+{
+ "schema_version": "1.0.0",
+ "kind": "evaluate",
+ "created_at": "2026-11-21T06:47:07.635354+00:00",
+ "seed": 0,
+ "config": {
+  "systems": [
+   "unprocessed",
+   "baseline_ds",
+   "candidate_mask"
+  ]
+ },
+ "data": {
+  "name": "e2e-synth",
+  "version": "1.0.0",
+  "release_manifest_sha256": "b295d081a4fa672d65b81cbadac016a88f127e0267902a1abfbb684f615fe778",
+  "split": "test"
+ },
+ "checkpoint": {
+  "path": "mask_model.npz",
+  "sha256": "9883146fec607dd4d2657561dc768f3de31a5da17ad6c50644a881e0d40afb9b",
+  "n_frames": 240200
+ },
+ "metrics": {
+  "means": {
+   "unprocessed": {
+    "si_sdri_db": 0.0,
+    "der": 1.4844693153799298
+   },
+   "baseline_ds": {
+    "si_sdri_db": -4.763496721117873,
+    "der": 1.468193376322308,
+    "doa_err_deg": 46.001321914492955
+   },
+   "candidate_mask": {
+    "si_sdri_db": 0.7718999877176839,
+    "der": 1.2755255964601548,
+    "doa_err_deg": 46.001321914492955
+   }
+  },
+  "paired": {
+   "candidate_mask-vs-unprocessed:si_sdri_db": {
+    "n": 30,
+    "mean_diff": 0.7718999877176839,
+    "ci95": [
+     0.368123097296363,
+     1.2371347608245835
+    ]
+   },
+   "candidate_mask-vs-unprocessed:der": {
+    "n": 30,
+    "mean_diff": -0.20894371891977495,
+    "ci95": [
+     -0.24835993769855128,
+     -0.16958188864965618
+    ]
+   },
+   "candidate_mask-vs-baseline_ds:si_sdri_db": {
+    "n": 30,
+    "mean_diff": 5.535396708835558,
+    "ci95": [
+     4.785424150918054,
+     6.222190420823958
+    ]
+   },
+   "candidate_mask-vs-baseline_ds:der": {
+    "n": 30,
+    "mean_diff": -0.19266777986215314,
+    "ci95": [
+     -0.23823162930540576,
+     -0.14839060187449502
+    ]
+   },
+   "candidate_mask-vs-baseline_ds:doa_err_deg": {
+    "n": 30,
+    "mean_diff": 0.0,
+    "ci95": [
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "n_scenes": 30
+ },
+ "evaluator": {
+  "module": "evaluation.compare",
+  "der_collar_s": 0.0,
+  "si_sdri": "permutation, missing=0"
+ },
+ "code": {
+  "commit": "fd867f9ef6ccf2639679aba72d13ccdcef20f78c",
+  "dirty": true
+ },
+ "environment": {
+  "python": "3.14.8",
+  "numpy": "2.5.5",
+  "scipy": "1.18.1",
+  "platform": "Windows-11-10.0.26300-SP0"
+ }
+}

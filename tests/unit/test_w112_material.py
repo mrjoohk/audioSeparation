@@ -97,8 +97,9 @@ class TestRegisterAndGet:
         assert "nonexistent_xyz" not in db
 
     def test_len_prepopulated(self, db):
-        # 7 standard materials
-        assert len(db) == 7
+        # 8 standard materials (incl. "anechoic", added for REQ-W04/W03 tests;
+        # design doc §8)
+        assert len(db) == 8
 
     def test_sigma_all_005_for_standard(self, db):
         for name in ("concrete", "brick", "carpet", "glass", "wood", "acoustic_tile", "default"):

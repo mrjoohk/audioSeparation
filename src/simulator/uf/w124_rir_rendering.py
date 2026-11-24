@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 import sys
+import zlib
 import warnings
 from pathlib import Path
 from typing import Optional
@@ -43,6 +44,19 @@ from w122_reverberation import generate_late_reverb_tail, fit_rt60
 # ---------------------------------------------------------------------------
 _MIN_RIR_DURATION_S: float = 0.5
 _OLA_SEGMENT_LENGTH: int = 2048
+FRACTIONAL_HALF_WIDTH: int = 16   # taps on each side of a fractional-delay kernel
+
+
+def _place_fractional(h: np.ndarray, delay: float, amp: float, hw: int = FRACTIONAL_HALF_WIDTH) -> None:
+    """Add ``amp`` at fractional sample ``delay`` with a Hann-windowed sinc kernel."""
+    n0 = int(math.floor(delay))
+    k = np.arange(n0 - hw + 1, n0 + hw + 1)
+    x = k - delay
+    w = 0.5 * (1.0 + np.cos(np.pi * x / hw))
+    w[np.abs(x) >= hw] = 0.0
+    ker = amp * np.sinc(x) * w
+    ok = (k >= 0) & (k < len(h))
+    np.add.at(h, k[ok], ker[ok])
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +71,12 @@ def generate_static_rir(
     rir_duration_s: Optional[float] = None,
     c: float = SPEED_OF_SOUND,
     mic_pos: Optional[np.ndarray] = None,
+    fractional_delay: bool = False,
+    src_pos: Optional[np.ndarray] = None,
+    path_response=None,
+    tail_gain: float = 1.0,
+    tail_seed_salt: str = "",
+    include_direct: bool = True,
 ) -> RIR:
     """Build a full RIR from direct path, image sources, and late reverb tail.
 
@@ -83,6 +103,20 @@ def generate_static_rir(
         image-source delays.  ``None`` keeps the legacy behaviour of measuring
         image-source distances from the world origin and emits a warning when
         image sources are present.
+    fractional_delay : bool
+        False (default, REQ-W03 "quantised to 1/Fs"): Diracs at rounded
+        sample delays.  True: Hann-windowed sinc kernels (half-width
+        ``FRACTIONAL_HALF_WIDTH``) at the exact delay, needed for array/TDOA
+        work where one sample is several degrees (audit F-09).
+    src_pos, path_response : optional
+        Per-path receiver response (directivity gain or binaural FIR), called
+        with the world arrival direction (source/image → mic reversed: the
+        vector from the mic towards the path origin).  Needs ``mic_pos`` and,
+        for the direct path, ``src_pos``.  A returned float scales the path;
+        a returned array is a centred FIR placed at the path arrival time.
+    tail_gain, tail_seed_salt :
+        Diffuse-field gain of the late tail and a salt that decorrelates the
+        tail between channels (e.g. the two ears).
     """
     rt60_estimate = float(reflection_data.late_tail_spec.rt60_s)
     mixing_time_ms = float(reflection_data.late_tail_spec.mixing_time_ms)
@@ -100,7 +134,31 @@ def generate_static_rir(
     occ_gain = 10.0 ** (-float(occlusion_result.loss_db) / 20.0)
     direct_amplitude = float(direct_path.attenuation_linear) * occ_gain
     direct_idx = int(direct_path.delay_samples)
-    if 0 <= direct_idx < n_samples:
+
+    def _place(delay: float, amp: float, origin) -> None:
+        if path_response is not None and origin is not None and mic_pos is not None:
+            r = path_response(np.asarray(origin, float) - np.asarray(mic_pos, float))
+            if np.ndim(r) == 0:
+                amp = amp * float(r)
+            else:
+                fir = np.asarray(r, dtype=np.float64)
+                start = int(round(delay)) - (len(fir) - 1) // 2
+                k = np.arange(start, start + len(fir))
+                ok = (k >= 0) & (k < n_samples)
+                h[k[ok]] += amp * fir[ok]
+                return
+        if fractional_delay:
+            _place_fractional(h, delay, amp)
+        else:
+            i = int(round(delay))
+            if 0 <= i < n_samples:
+                h[i] += amp
+
+    if not include_direct:
+        pass
+    elif fractional_delay or path_response is not None:
+        _place(float(direct_path.delay_s) * fs, direct_amplitude, src_pos)
+    elif 0 <= direct_idx < n_samples:
         h[direct_idx] += direct_amplitude
 
     # --- Image sources ---
@@ -116,25 +174,38 @@ def generate_static_rir(
     else:
         mic = np.asarray(mic_pos, dtype=np.float64)
 
-    for img in reflection_data.image_sources:
-        img_pos = np.asarray(img.position, dtype=np.float64)
-        dist_img = float(np.linalg.norm(img_pos - mic))
-        delay_samples_img = int(round(dist_img / c * fs))
-        if 0 <= delay_samples_img < n_samples:
-            h[delay_samples_img] += float(img.path_gain)
+    if reflection_data.image_sources:
+        img_pos = np.array([img.position for img in reflection_data.image_sources], dtype=np.float64)
+        gains = np.array([img.path_gain for img in reflection_data.image_sources], dtype=np.float64)
+        delays = np.linalg.norm(img_pos - mic, axis=1) / c * fs
+        if fractional_delay or path_response is not None:
+            for dly, g, pos in zip(delays, gains, img_pos):
+                _place(float(dly), float(g), pos)
+        else:
+            idx = np.rint(delays).astype(np.int64)
+            ok = (idx >= 0) & (idx < n_samples)
+            np.add.at(h, idx[ok], gains[ok])
 
     # --- Late reverb tail (energy-continuous at the mixing time) ---
-    mixing_onset_sample = int(round(mixing_time_ms * 1e-3 * fs))
+    # The mixing time is measured from the direct-sound arrival: the tail must
+    # never precede the direct path (it did for distant sources in absorptive
+    # rooms, where the absolute mixing time was shorter than the direct delay).
+    direct_onset = max(int(direct_path.delay_samples), 0)
+    mixing_rel = int(round(mixing_time_ms * 1e-3 * fs))
+    mixing_onset_sample = direct_onset + mixing_rel
     if rt60_estimate > 0.0 and mixing_onset_sample < n_samples:
+        tail_seed = seed if not tail_seed_salt else (
+            (int(seed) ^ zlib.crc32(tail_seed_salt.encode("utf-8"))) & 0x7FFFFFFF)
         tail = generate_late_reverb_tail(
             rt60_s=rt60_estimate,
-            mixing_time_ms=mixing_time_ms,
+            mixing_time_ms=mixing_onset_sample * 1e3 / fs,
             fs=fs,
             n_samples=n_samples,
-            seed=seed,
-        ).astype(np.float64)
-        t_mix_s = mixing_onset_sample / float(fs)
-        tail_onset_amp = 0.1 * direct_amplitude * math.exp(-6.9 * t_mix_s / rt60_estimate)
+            seed=tail_seed,
+        ).astype(np.float64) * float(tail_gain)
+        t_mix_s = mixing_rel / float(fs)
+        level_scale = float(getattr(reflection_data.late_tail_spec, "level_scale", 1.0))
+        tail_onset_amp = 0.1 * level_scale * direct_amplitude * math.exp(-6.9 * t_mix_s / rt60_estimate)
         h += tail * tail_onset_amp
 
     if not np.all(np.isfinite(h)):
@@ -154,8 +225,9 @@ def generate_static_rir(
         rt60_measured = rt60_estimate
 
     # --- DRR ---
-    direct_window_start = max(0, direct_idx - 1)
-    direct_window_end = min(n_samples, direct_idx + 2)
+    hw = FRACTIONAL_HALF_WIDTH if fractional_delay else 1
+    direct_window_start = max(0, direct_idx - hw)
+    direct_window_end = min(n_samples, direct_idx + hw + 1)
     e_direct = float(np.sum(h[direct_window_start:direct_window_end] ** 2))
     e_reverb = float(np.sum(h[:direct_window_start] ** 2)) + float(
         np.sum(h[direct_window_end:] ** 2)
@@ -188,12 +260,70 @@ def generate_static_rir_with_mic(
     mic_pos: np.ndarray,
     rir_duration_s: Optional[float] = None,
     c: float = SPEED_OF_SOUND,
+    fractional_delay: bool = False,
+    **kwargs,
 ) -> RIR:
     """Variant of :func:`generate_static_rir` with a mandatory ``mic_pos``."""
     return generate_static_rir(
         direct_path, reflection_data, occlusion_result, fs,
         rir_duration_s=rir_duration_s, c=c, mic_pos=mic_pos,
+        fractional_delay=fractional_delay, **kwargs,
     )
+
+
+OCTAVE_CENTERS_HZ = (125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0)
+
+
+def octave_band_sos(fs: int, order: int = 4):
+    """Causal octave-band filters: lowpass for 125 Hz, bandpasses, highpass for 4 kHz.
+
+    Causal (sosfilt) so band-shaped reflections never precede their arrival.
+    """
+    nyq = fs / 2.0
+    edges = [c * math.sqrt(2.0) for c in OCTAVE_CENTERS_HZ[:-1]]       # 177 … 2828 Hz
+    sos = []
+    for b in range(len(OCTAVE_CENTERS_HZ)):
+        lo = edges[b - 1] if b > 0 else None
+        hi = edges[b] if b < len(edges) else None
+        if hi is not None and hi >= nyq * 0.98:
+            hi = None
+        if lo is not None and lo >= nyq * 0.98:
+            sos.append(None)
+            continue
+        if lo is None:
+            sos.append(sp_signal.butter(order, hi / nyq, btype="lowpass", output="sos"))
+        elif hi is None:
+            sos.append(sp_signal.butter(order, lo / nyq, btype="highpass", output="sos"))
+        else:
+            sos.append(sp_signal.butter(order // 2, [lo / nyq, hi / nyq], btype="bandpass", output="sos"))
+    return sos
+
+
+def compose_band_rir(direct_rir: RIR, band_rirs, fs: int) -> RIR:
+    """Broadband direct path + octave-band-filtered reflections/tails (render.band_reverb)."""
+    sos = octave_band_sos(fs)
+    n = max([len(direct_rir.h)] + [len(r.h) for r in band_rirs])
+    h = np.zeros(n)
+    h[: len(direct_rir.h)] += direct_rir.h
+    for b, r in enumerate(band_rirs):
+        if sos[b] is None:
+            continue
+        x = np.zeros(n)
+        x[: len(r.h)] = r.h
+        h += sp_signal.sosfilt(sos[b], x)
+    if not np.all(np.isfinite(h)):
+        raise ValueError("compose_band_rir: non-finite RIR")
+    h32 = h.astype(np.float32)
+    try:
+        rt60 = float(fit_rt60(h32, fs=fs, target_rt60=None)["rt60_measured_s"])
+    except Exception:
+        rt60 = direct_rir.rt60_measured_s
+    d = int(direct_rir.peak_delay_samples)
+    e_d = float(np.sum(direct_rir.h.astype(np.float64) ** 2))
+    e_r = float(np.sum((h - np.pad(direct_rir.h.astype(np.float64), (0, n - len(direct_rir.h)))) ** 2))
+    drr = 60.0 if e_r < 1e-30 else (-60.0 if e_d < 1e-30 else 10.0 * math.log10(e_d / e_r))
+    return RIR(source_id=direct_rir.source_id, receiver_id=direct_rir.receiver_id, h=h32, fs=fs,
+               rt60_measured_s=rt60, drr_db=drr, peak_delay_samples=int(np.argmax(np.abs(h32))))
 
 
 # ---------------------------------------------------------------------------
@@ -230,8 +360,11 @@ def _synthetic_hrtf(
     HEAD_RADIUS_M = 0.0875
     c = SPEED_OF_SOUND
 
-    # Woodworth ITD model:  ITD = (r / c) * (az + sin(az))
-    itd_s = (HEAD_RADIUS_M / c) * (az_rad + math.sin(az_rad))
+    # Woodworth ITD model on the *lateral* angle (valid within ±90°):
+    #   lat = asin(sin(az) cos(el)),  ITD = (r / c) * (lat + sin(lat))
+    # Using the raw azimuth overshot the physical maximum for sources behind the head.
+    lat = math.asin(max(-1.0, min(1.0, math.sin(az_rad) * math.cos(el_rad))))
+    itd_s = (HEAD_RADIUS_M / c) * (lat + math.sin(lat))
     itd_samples = itd_s * fs  # fractional sample delay
 
     # ILD: ±6 dB at ±90° azimuth, modulated by elevation (cos(el) factor)

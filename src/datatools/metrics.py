@@ -93,6 +93,32 @@ def join_streams(segments: Sequence[Tuple[float, str]]) -> str:
     return " ".join(txt for _, txt in sorted(segments, key=lambda s: s[0]) if txt)
 
 
+def cp_wer(references: Sequence[str], hypotheses: Sequence[str]) -> Dict[str, float]:
+    """Concatenated minimum-permutation WER (cpWER, CHiME-6 / MeetEval).
+
+    Each reference speaker's words are compared with one hypothesis stream's
+    words (each stream joined in its own time order); the stream-to-speaker
+    assignment with the fewest errors is used.  Unequal counts are padded with
+    empty texts, so missing streams count as deletions and extra streams as
+    insertions.  ``wer`` = total errors / total reference words.
+    """
+    import itertools
+    refs, hyps = list(references), list(hypotheses)
+    k = max(len(refs), len(hyps))
+    refs += [""] * (k - len(refs))
+    hyps += [""] * (k - len(hyps))
+    cost = [[wer(r, h) for h in hyps] for r in refs]
+    n_ref = sum(c[0]["n_ref"] for c in cost)
+    best, best_perm = None, None
+    for perm in itertools.permutations(range(k)):
+        e = sum(cost[i][j]["substitutions"] + cost[i][j]["deletions"] + cost[i][j]["insertions"]
+                for i, j in enumerate(perm))
+        if best is None or e < best:
+            best, best_perm = e, perm
+    rate = (best / n_ref) if n_ref else (0.0 if best == 0 else math.inf)
+    return {"errors": best, "n_ref": n_ref, "wer": rate, "assignment": list(best_perm)}
+
+
 def wer(reference: str, hypothesis: str, normalize: bool = True) -> Dict[str, float]:
     """Word error rate by token edit distance.
 

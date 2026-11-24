@@ -1,0 +1,70 @@
+{
+  "env": {
+    "python": "3.14.8",
+    "machine": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+    "cpu_count": 12,
+    "date": "2026-11-21"
+  },
+  "rir": [
+    {
+      "workers": 1,
+      "n_rirs": 400,
+      "wall_s": 2.1963332000013907,
+      "rirs_per_s": 345.18830798900757,
+      "rirs_per_s_incl_startup": 182.12172907086534,
+      "single_worker_rirs_per_s": 345.18830798900757
+    },
+    {
+      "workers": 8,
+      "n_rirs": 8000,
+      "wall_s": 7.021120399993379,
+      "rirs_per_s": 1577.5649441111982,
+      "rirs_per_s_incl_startup": 1139.4192869855278,
+      "single_worker_rirs_per_s": 199.52555878972876
+    }
+  ],
+  "scenes": [
+    {
+      "storage_profile": "full",
+      "workers": 8,
+      "scenes": 16,
+      "scene_duration_s": 10.0,
+      "sources": 2,
+      "receivers": 4,
+      "ism_order": 3,
+      "completed": 16,
+      "failed": 0,
+      "failure_reasons": {},
+      "wall_s": 4.369525000001886,
+      "scenes_per_hour": 13182.210881039733,
+      "audio_hours_rendered": 0.05767090277777777,
+      "qc_passed_audio_hours_per_hour": 47.893817609175365,
+      "bytes_written": 257815470,
+      "bytes_per_scene": 16113466.875,
+      "fail_rate": 0.0
+    },
+    {
+      "storage_profile": "training",
+      "workers": 8,
+      "scenes": 16,
+      "scene_duration_s": 10.0,
+      "sources": 2,
+      "receivers": 4,
+      "ism_order": 3,
+      "completed": 16,
+      "failed": 0,
+      "failure_reasons": {},
+      "wall_s": 4.26269940000202,
+      "scenes_per_hour": 13512.564362378615,
+      "audio_hours_rendered": 0.05767090277777777,
+      "qc_passed_audio_hours_per_hour": 48.748433637231905,
+      "bytes_written": 159718414,
+      "bytes_per_scene": 9982400.875,
+      "fail_rate": 0.0
+    }
+  ],
+  "targets": {
+    "REQ-W04_rirs_per_s": 1000,
+    "REQ-W10_scenes_per_hour_8core": 1000
+  }
+}

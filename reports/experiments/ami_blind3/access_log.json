@@ -1,0 +1,24 @@
+[
+ {
+  "frozen_sha256": "39e9a93eebd5b04b5a4bfc969c8e894dee5a9870200a84a696a8afcc48685cf3",
+  "candidate": "v3-mix",
+  "sessions": [
+   "ami-TS3009a",
+   "ami-TS3009b",
+   "ami-TS3009c",
+   "ami-TS3009d",
+   "ami-TS3010a",
+   "ami-TS3010b",
+   "ami-TS3010c",
+   "ami-TS3010d",
+   "ami-TS3011a",
+   "ami-TS3011b",
+   "ami-TS3011c",
+   "ami-TS3011d",
+   "ami-TS3012a",
+   "ami-TS3012b",
+   "ami-TS3012c",
+   "ami-TS3012d"
+  ]
+ }
+]

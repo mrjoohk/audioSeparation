@@ -1,0 +1,18 @@
+# W2 scenario prior (REQ-201).  Keys map to datagen.planner.ScenarioPrior.
+room_L: [3.0, 10.0]
+room_W: [3.0, 8.0]
+room_H: [2.5, 4.0]
+materials: [wood, carpet, brick, acoustic_tile, concrete]
+n_speakers: [1, 4]
+arrays: [single, pair10, circular4]
+tiers: {easy: 0.0, medium: 0.2, hard: 0.5}
+tier_weights: {easy: 1, medium: 1, hard: 1}
+snr_db: [0.0, 20.0]
+noise_prob: 0.8
+duration_s: 6.0
+speech_level_dbfs: [-30.0, -22.0]
+sample_rate: 16000
+ism_order: 3
+n_room_templates: 60
+storage_profile: training
+max_peak_dbfs: -1.0

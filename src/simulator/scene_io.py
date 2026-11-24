@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from scipy.io import wavfile
 
-RENDERER_VERSION = "w1-static_v1/2026.11.21"
+RENDERER_VERSION = "w1-static_v1/2026.11.21c"  # c: late tail starts after direct arrival
 MANIFEST_SCHEMA_VERSION_V2 = "2.0.0"
 MANIFEST_NAME = "scene_manifest.json"
 STAGING_DIRNAME = ".staging"

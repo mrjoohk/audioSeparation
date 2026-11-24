@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "generated_by": "scripts/build_project_template.py",
+  "hash_mode": "UTF-8 universal newlines for text; raw bytes otherwise",
+  "categories": [
+    "engineering_pipeline",
+    "agent_orchestration"
+  ],
+  "include_skills": [
+    "repo-doc-writer",
+    "cursor-task-formatter",
+    "code-reviewer",
+    "project-summarizer"
+  ],
+  "skills": [
+    "core-engineering",
+    "context-engineering",
+    "req-elicitor",
+    "if-designer",
+    "uf-designer",
+    "uf-chain-validator",
+    "uf-implementor",
+    "if-integrator",
+    "uf-if-debug-mapper",
+    "theory-decomposer",
+    "eval-planner",
+    "exp-runner",
+    "eval-runner",
+    "ci-evidence-automation",
+    "fresh-eyes-auditor",
+    "agent-orchestration",
+    "agent-executor",
+    "repo-doc-writer",
+    "cursor-task-formatter",
+    "code-reviewer",
+    "project-summarizer"
+  ],
+  "targets": [],
+  "files": [],
+  "mode": "shared"
+}

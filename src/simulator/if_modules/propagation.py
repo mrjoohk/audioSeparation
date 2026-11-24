@@ -45,7 +45,13 @@ class AcousticPropagationEngine:
         c: float = SPEED_OF_SOUND,
         ism_order: int = 3,
         seed: int = 0,
+        fractional_delay: bool = False,
+        receiver_models: Optional[Dict[str, object]] = None,
+        band_reverb: bool = False,
     ) -> None:
+        self.band_reverb = bool(band_reverb)
+        self.fractional_delay = bool(fractional_delay)
+        self.receiver_models = receiver_models or {}
         self.fs = fs
         self.c = c
         self.ism_order = ism_order
@@ -75,7 +81,7 @@ class AcousticPropagationEngine:
         )
 
     def compute_reflections(
-        self, scene_state: SceneState, src_id: str, rec_id: str
+        self, scene_state: SceneState, src_id: str, rec_id: str, band_index: int = 2,
     ) -> ReflectionData:
         """Compute image sources and late reverb tail description."""
         src = self._get_source(scene_state, src_id)
@@ -91,11 +97,12 @@ class AcousticPropagationEngine:
             mic_pos=rec.position,
             ism_order=self.ism_order,
             material_map_or_alpha_per_wall=scene_state.materials,
+            band_index=band_index,
         )
 
         # Estimate RT60 from Sabine for late tail
         try:
-            rt60_est = estimate_sabine_rt60(dims, scene_state.materials)
+            rt60_est = estimate_sabine_rt60(dims, scene_state.materials, band_index=band_index)
         except Exception:
             rt60_est = 0.5  # fallback
 
@@ -103,6 +110,7 @@ class AcousticPropagationEngine:
 
         late_spec = LateReverbSpec(
             rt60_s=rt60_est,
+            level_scale=_mean_reflection_coefficient(scene_state.materials, band_index),
             mixing_time_ms=mixing_time_ms,
             seed=self.pair_seed(src_id, rec_id),
         )
@@ -138,15 +146,36 @@ class AcousticPropagationEngine:
         occlusion = self.compute_occlusion(scene_state, src_id, rec_id)
 
         rec = self._get_receiver(scene_state, rec_id)
-
-        rir = generate_static_rir_with_mic(
-            direct_path=direct,
-            reflection_data=reflections,
+        src = self._get_source(scene_state, src_id)
+        model = self.receiver_models.get(rec_id)
+        common = dict(
             occlusion_result=occlusion,
             mic_pos=rec.position,
             fs=self.fs,
             c=self.c,
+            fractional_delay=self.fractional_delay,
+            src_pos=src.position,
+            path_response=getattr(model, "path_response", None),
+            tail_gain=getattr(model, "tail_gain", 1.0),
+            tail_seed_salt=getattr(model, "tail_salt", ""),
         )
+        if not self.band_reverb:
+            rir = generate_static_rir_with_mic(direct_path=direct, reflection_data=reflections, **common)
+        else:
+            from simulator.uf.w124_rir_rendering import compose_band_rir
+            n = None
+            band_rirs = []
+            for b in range(6):
+                refl_b = self.compute_reflections(scene_state, src_id, rec_id, band_index=b)
+                band_rirs.append(generate_static_rir_with_mic(
+                    direct_path=direct, reflection_data=refl_b, include_direct=False,
+                    rir_duration_s=None, **common))
+            direct_only = generate_static_rir_with_mic(
+                direct_path=direct,
+                reflection_data=ReflectionData(image_sources=[], late_tail_spec=LateReverbSpec(
+                    rt60_s=0.0, mixing_time_ms=0.0, seed=0)),
+                rir_duration_s=max(len(r.h) for r in band_rirs) / self.fs, **common)
+            rir = compose_band_rir(direct_only, band_rirs, self.fs)
 
         self._rir_cache[cache_key] = rir
         return rir
@@ -231,6 +260,20 @@ class AcousticPropagationEngine:
             if r.receiver_id == rec_id:
                 return r
         raise KeyError(f"Receiver '{rec_id}' not found in SceneState")
+
+
+def _mean_reflection_coefficient(materials, band_index: int = 2) -> float:
+    """Mean of sqrt(1 - alpha_500Hz) over room surfaces (1.0 if unknown).
+
+    Scales the stochastic late tail so fully absorbing rooms have none.
+    """
+    if not materials:
+        return 1.0
+    vals = []
+    for spec in materials.values():
+        alpha = float(np.clip(np.asarray(spec.alpha, dtype=float)[band_index], 0.0, 1.0))
+        vals.append(np.sqrt(1.0 - alpha))
+    return float(np.mean(vals)) if vals else 1.0
 
 
 # ---------------------------------------------------------------------------

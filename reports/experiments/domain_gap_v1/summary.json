@@ -1,0 +1,153 @@
+{
+ "proxy_domain_note": "No real recordings: the 'real' domain is a simulated proxy (other rooms, band reverb, 4 kHz device, sensitivity mismatch, held-out arrays).",
+ "calibration": {
+  "profile_id": "calib-84d4643404",
+  "rt60_median_s": 0.3777335731130916,
+  "kl_measured_vs_regenerated": 0.24282404541191693,
+  "req302_kl_le_0_1": false
+ },
+ "req303": {
+  "unseen_gain_M1_vs_M0_db": -1.107575939756893,
+  "req303_gain_ge_1_5db": false,
+  "per_array": {
+   "circular3_r3": {
+    "M0_drop_db": 3.8205149986582465,
+    "M1_drop_db": 6.093848122336293,
+    "halved": false
+   },
+   "linear3_4cm": {
+    "M0_drop_db": 1.2650211715739603,
+    "M1_drop_db": 2.9083615000445477,
+    "halved": false
+   },
+   "square4_8cm": {
+    "M0_drop_db": 2.5473995320722063,
+    "M1_drop_db": 2.8910975088731177,
+    "halved": false
+   }
+  }
+ },
+ "req304": {
+  "domain_bce_before": 0.692101795504978,
+  "domain_bce_after": 0.6859145368607454,
+  "note": "diagnostic only (design \u00a76.3)"
+ },
+ "adoption": {
+  "dev_ci_lower_vs_M0": {
+   "M1_augmented": -1.6953950512507958,
+   "M2_aug_coral": -1.9613354225698643
+  },
+  "adopted": "M0_baseline"
+ },
+ "means": {
+  "in_domain": {
+   "unprocessed": {
+    "si_sdri_db": 0.0,
+    "der": 1.8073662422651708
+   },
+   "M0_baseline": {
+    "si_sdri_db": 0.5225382166972782,
+    "der": 1.5433641255073143,
+    "doa_err_deg": 36.42857615062026
+   },
+   "M1_augmented": {
+    "si_sdri_db": 0.35102493481866875,
+    "der": 1.4961327355021974,
+    "doa_err_deg": 36.42857615062026
+   },
+   "M2_aug_coral": {
+    "si_sdri_db": 0.24861818557710288,
+    "der": 1.4773064664328015,
+    "doa_err_deg": 36.42857615062026
+   },
+   "M3_coral_only": {
+    "si_sdri_db": 0.3995894275094292,
+    "der": 1.5372065170387355,
+    "doa_err_deg": 36.42857615062026
+   }
+  },
+  "proxy_dev": {
+   "unprocessed": {
+    "si_sdri_db": 0.0,
+    "der": 1.7962611156456234
+   },
+   "M0_baseline": {
+    "si_sdri_db": 0.18019967226709924,
+    "der": 1.5842227283996435,
+    "doa_err_deg": 21.188478758251517
+   },
+   "M1_augmented": {
+    "si_sdri_db": -0.9177369164926347,
+    "der": 1.543339500032507,
+    "doa_err_deg": 21.188478758251517
+   },
+   "M2_aug_coral": {
+    "si_sdri_db": -1.066380382163811,
+    "der": 1.5385528924895169,
+    "doa_err_deg": 21.188478758251517
+   },
+   "M3_coral_only": {
+    "si_sdri_db": -0.4040233778359731,
+    "der": 1.5720809424022257,
+    "doa_err_deg": 21.188478758251517
+   }
+  },
+  "proxy_test": {
+   "unprocessed": {
+    "si_sdri_db": 0.0,
+    "der": 1.1987417676361767
+   },
+   "M0_baseline": {
+    "si_sdri_db": -1.9698850680354667,
+    "der": 0.9649139565219649,
+    "doa_err_deg": 38.36876183600133
+   },
+   "M1_augmented": {
+    "si_sdri_db": -3.0774610077923596,
+    "der": 0.9525097278796905,
+    "doa_err_deg": 38.36876183600133
+   },
+   "M2_aug_coral": {
+    "si_sdri_db": -3.511663207481067,
+    "der": 0.9483173499607916,
+    "doa_err_deg": 38.36876183600133
+   },
+   "M3_coral_only": {
+    "si_sdri_db": -2.4494063588215798,
+    "der": 0.949409403107349,
+    "doa_err_deg": 38.36876183600133
+   }
+  }
+ },
+ "ablation": {
+  "dashboard": "reports\\experiments\\ablation_v1\\ablation.pdf",
+  "impact": {
+   "adaptation": {
+    "der": {
+     "delta": 0.004192377918898815,
+     "impact_pct": 0.4420859661665106
+    },
+    "si_sdri_db": {
+     "delta": 0.4342021996887073,
+     "impact_pct": 12.364574107326273
+    }
+   },
+   "augmentation": {
+    "der": {
+     "delta": 0.001092053146557359,
+     "impact_pct": 0.11515692996679965
+    },
+    "si_sdri_db": {
+     "delta": 1.0622568486594872,
+     "impact_pct": 30.249394258438844
+    }
+   }
+  },
+  "interactions": {
+   "adaptation+augmentation": {
+    "der": 0.011312175495717058,
+    "si_sdri_db": 0.04531909109740573
+   }
+  }
+ }
+}

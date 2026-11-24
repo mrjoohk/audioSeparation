@@ -1,0 +1,40 @@
+{
+ "metrics": [
+  "der",
+  "si_sdri_db"
+ ],
+ "base": {
+  "si_sdri_db": -3.511663207481067,
+  "der": 0.9483173499607916
+ },
+ "impact": {
+  "adaptation": {
+   "der": {
+    "delta": 0.004192377918898815,
+    "impact_pct": 0.4420859661665106
+   },
+   "si_sdri_db": {
+    "delta": 0.4342021996887073,
+    "impact_pct": 12.364574107326273
+   }
+  },
+  "augmentation": {
+   "der": {
+    "delta": 0.001092053146557359,
+    "impact_pct": 0.11515692996679965
+   },
+   "si_sdri_db": {
+    "delta": 1.0622568486594872,
+    "impact_pct": 30.249394258438844
+   }
+  }
+ },
+ "interactions": {
+  "adaptation+augmentation": {
+   "der": 0.011312175495717058,
+   "si_sdri_db": 0.04531909109740573
+  }
+ },
+ "delta_correlation": {},
+ "factors_missing_metrics": []
+}

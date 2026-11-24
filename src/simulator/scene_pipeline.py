@@ -44,6 +44,12 @@ from simulator.config_resolver import (
     resolve_config,
     strip_private,
 )
+from datatools.vad import (
+    overlap_ratio as vad_overlap_ratio,
+    segments_to_mask,
+    shift_segments,
+    vad_segments,
+)
 from simulator.scene_io import (
     AUDIO_ENCODING,
     MANIFEST_NAME,
@@ -217,6 +223,136 @@ def apply_array_errors(resolved: dict) -> Tuple[dict, List[dict], List[str]]:
     return eff, records, approx
 
 
+
+# ---------------------------------------------------------------------------
+# Receiver models, binaural expansion, dynamic rendering (stage 6)
+# ---------------------------------------------------------------------------
+
+BINAURAL_HALF_WIDTH = 64      # half of the 128-tap synthetic HRTF FIR
+RERENDER_THRESHOLD_M = 0.05   # REQ-W06: new RIR when a source/mic moves more than 5 cm
+
+
+def expand_binaural(eff: dict, rec_records: List[dict]) -> Tuple[dict, List[dict]]:
+    """Replace each binaural receiver by two ear channels ``<id>.L`` / ``<id>.R``."""
+    out_recs, out_records = [], []
+    ref = eff.get("reference_receiver")
+    for rec, record in zip(eff["receivers"], rec_records):
+        if rec.get("binaural"):
+            for ear in ("L", "R"):
+                r2 = copy.deepcopy(rec)
+                r2.pop("binaural", None)
+                r2["receiver_id"] = f"{rec['receiver_id']}.{ear}"
+                r2["ear"] = ear
+                r2["head"] = rec["receiver_id"]
+                out_recs.append(r2)
+                out_records.append({**record, "receiver_id": r2["receiver_id"], "ear": ear,
+                                    "head": rec["receiver_id"],
+                                    "hrtf": dict(rec["hrtf"]) if rec.get("hrtf") else {"model": "synthetic_sphere"}})
+            if ref == rec["receiver_id"]:
+                eff["reference_receiver"] = f"{rec['receiver_id']}.L"
+        else:
+            out_recs.append(rec)
+            out_records.append(record)
+    eff["receivers"] = out_recs
+    return eff, out_records
+
+
+def receiver_models(eff: dict, fs: int) -> Dict[str, object]:
+    from simulator.receiver_models import (
+        ReceiverModel, binaural_response, diffuse_gain, directivity_response,
+    )
+    models = {}
+    for r in eff["receivers"]:
+        yaw = float(r.get("yaw_deg", 0.0))
+        if r.get("ear"):
+            models[r["receiver_id"]] = ReceiverModel(binaural_response(r["ear"], yaw, fs, hrtf=r.get("hrtf")),
+                                                     tail_salt=r["ear"])
+        elif str(r.get("pattern", "omni")) != "omni":
+            pat = str(r["pattern"])
+            models[r["receiver_id"]] = ReceiverModel(directivity_response(pat, yaw), tail_gain=diffuse_gain(pat))
+    return models
+
+
+def _delay_at(trace: np.ndarray, n: int, hop: int) -> int:
+    return int(trace[min(max(n, 0) // hop, len(trace) - 1)]) if len(trace) > 1 else int(trace[0])
+
+
+def shift_segments_varying(segs, trace: np.ndarray, hop: int, limit: int, extra: int = 0):
+    """Map emission-time segments to arrival time with a per-tick delay trace."""
+    out = []
+    for a, b in segs:
+        a2 = max(0, a + _delay_at(trace, a, hop) + extra)
+        b2 = min(limit, b + _delay_at(trace, max(a, b - 1), hop) + extra)
+        if b2 > a2:
+            out.append((int(a2), int(b2)))
+    return out
+
+
+def render_dynamic(engine, states, dry: np.ndarray, src_ids, rec_ids, fs: int, hop: int,
+                   tail_policy: str):
+    """Time-varying rendering (dynamic_v1, REQ-W06).
+
+    The dry signal is split by Hann windows centred on every tick (hop = one
+    tick); the windows sum to one, so a static scene reduces exactly to a
+    single convolution.  A new RIR is computed only when the source or the
+    receiver moved more than 5 cm since the last key tick; consecutive ticks
+    sharing a key are convolved together.  Doppler is not modelled.
+    """
+    n_ticks = len(states)
+    n_dry = dry.shape[1]
+    win = np.zeros((n_ticks, n_dry))
+    n = np.arange(n_dry)
+    for t in range(n_ticks):
+        x = (n - t * hop) / hop
+        w = np.where(np.abs(x) < 1.0, 0.5 * (1.0 + np.cos(np.pi * x)), 0.0)
+        win[t] = w
+    win /= np.maximum(win.sum(axis=0), 1e-12)
+    keys, delay_trace, first_rir, first_direct, doa_trace = {}, {}, {}, {}, {}
+    for s in src_ids:
+        for r in rec_ids:
+            key_ticks, last = [], None
+            delays, doas = np.zeros(n_ticks, dtype=np.int64), []
+            for t, st in enumerate(states):
+                sp = next(x.position for x in st.sources if x.source_id == s)
+                rp = next(x.position for x in st.receivers if x.receiver_id == r)
+                if last is None or np.linalg.norm(sp - last[0]) > RERENDER_THRESHOLD_M \
+                        or np.linalg.norm(rp - last[1]) > RERENDER_THRESHOLD_M:
+                    key_ticks.append(t)
+                    last = (np.array(sp), np.array(rp))
+                d = engine.compute_direct_path(st, s, r)
+                delays[t] = int(d.delay_samples)
+                doas.append([t * hop / fs, math.degrees(d.doa_az_rad), math.degrees(d.doa_el_rad), int(d.delay_samples)])
+            keys[(s, r)] = key_ticks
+            delay_trace[(s, r)] = delays
+            doa_trace[(s, r)] = doas
+    rir_cache = {}
+    for (s, r), kt in keys.items():
+        for t in kt:
+            rir_cache[(s, r, t)] = engine.generate_rir(states[t], s, r)
+        first_rir[(s, r)] = rir_cache[(s, r, kt[0])]
+        first_direct[(s, r)] = engine.compute_direct_path(states[0], s, r)
+    L_max = max(len(h.h) for h in rir_cache.values())
+    T = n_dry + L_max - 1 if tail_policy == "keep" else n_dry
+    refs = np.zeros((len(src_ids), len(rec_ids), T))
+    for si, s in enumerate(src_ids):
+        for ci, r in enumerate(rec_ids):
+            kt = keys[(s, r)] + [n_ticks]
+            for j in range(len(kt) - 1):
+                w = win[kt[j]:kt[j + 1]].sum(axis=0)
+                nz = np.flatnonzero(w > 0)
+                if nz.size == 0:
+                    continue
+                a, b = int(nz[0]), int(nz[-1]) + 1
+                seg = dry[si, a:b] * w[a:b]
+                if not np.any(seg):
+                    continue
+                y = fftconvolve(seg, rir_cache[(s, r, kt[j])].h.astype(np.float64))
+                e = min(T, a + len(y))
+                refs[si, ci, a:e] += y[: e - a]
+    info = {"n_ticks": n_ticks, "hop": hop,
+            "key_rirs": {f"{s}->{r}": len(v) for (s, r), v in keys.items()}}
+    return refs, first_rir, first_direct, delay_trace, doa_trace, info, T
+
 # ---------------------------------------------------------------------------
 # Main entry
 # ---------------------------------------------------------------------------
@@ -273,6 +409,8 @@ def simulate_scene(
     # --- 2. array errors, scene build ------------------------------------
     eff, rec_records, arr_approx = apply_array_errors(resolved)
     approximations += arr_approx
+    eff, rec_records = expand_binaural(eff, rec_records)
+    rx_models = receiver_models(eff, fs)
     eff_cfg = SceneConfigValidator().validate(eff)
     eff_cfg.output_dir = out_root
 
@@ -296,45 +434,103 @@ def simulate_scene(
     src_ids = [s["source_id"] for s in eff["sources"]]
     rec_ids = [r["receiver_id"] for r in eff["receivers"]]
     S, C = len(src_ids), len(rec_ids)
-    ref_idx = rec_ids.index(resolved.get("reference_receiver", rec_ids[0]))
+    ref_idx = rec_ids.index(eff.get("reference_receiver", rec_ids[0]))
+    dynamic = resolved["render"]["profile"] == "dynamic_v1"
+    tick_rate = float(resolved["motion"].get("tick_rate_hz", 50.0))
+    hop = int(round(fs / tick_rate))
+    if dynamic and abs(hop * tick_rate - fs) > 1e-6:
+        raise UnsupportedProfileError(f"fs={fs} is not a multiple of tick_rate_hz={tick_rate}")
 
     # --- 3. propagation ---------------------------------------------------
     engine = AcousticPropagationEngine(
         fs=fs, c=float(resolved["speed_of_sound"]),
         ism_order=int(resolved["ism_order"]), seed=int(resolved["seed"]),
+        fractional_delay=bool(resolved["render"].get("fractional_delay", False)),
+        receiver_models=rx_models,
+        band_reverb=bool(resolved["render"].get("band_reverb", False)),
     )
-    rirs = {}
-    directs = {}
-    for s in src_ids:
-        for r in rec_ids:
-            rirs[(s, r)] = engine.generate_rir(state, s, r)
-            directs[(s, r)] = engine.compute_direct_path(state, s, r)
-    L_max = max(len(h.h) for h in rirs.values())
-    T = n_dry + L_max - 1 if resolved["render"]["tail"] == "keep" else n_dry
+    from simulator.uf.w124_rir_rendering import FRACTIONAL_HALF_WIDTH
+    kernel_hw = max(FRACTIONAL_HALF_WIDTH if engine.fractional_delay else 0,
+                    BINAURAL_HALF_WIDTH if any(r.get("ear") for r in eff["receivers"]) else 0)
+    dyn_info: Dict[str, object] = {}
+    doa_trace: Dict = {}
+    if dynamic:
+        refs, rirs, directs, delay_trace, doa_trace, dyn_info, T = render_dynamic(
+            engine, states, dry, src_ids, rec_ids, fs, hop, resolved["render"]["tail"])
+    else:
+        rirs, directs, delay_trace = {}, {}, {}
+        for s in src_ids:
+            for r in rec_ids:
+                rirs[(s, r)] = engine.generate_rir(state, s, r)
+                directs[(s, r)] = engine.compute_direct_path(state, s, r)
+                delay_trace[(s, r)] = np.array([int(directs[(s, r)].delay_samples)])
+        L_max = max(len(h.h) for h in rirs.values())
+        T = n_dry + L_max - 1 if resolved["render"]["tail"] == "keep" else n_dry
+        refs = np.zeros((S, C, T), dtype=np.float64)
+        for si, s in enumerate(src_ids):
+            for ci, r in enumerate(rec_ids):
+                y = fftconvolve(dry[si], rirs[(s, r)].h.astype(np.float64), mode="full")
+                n = min(len(y), T)
+                refs[si, ci, :n] = y[:n]
 
-    refs = np.zeros((S, C, T), dtype=np.float64)
-    for si, s in enumerate(src_ids):
-        for ci, r in enumerate(rec_ids):
-            y = fftconvolve(dry[si], rirs[(s, r)].h.astype(np.float64), mode="full")
-            n = min(len(y), T)
-            refs[si, ci, :n] = y[:n]
+    # --- 3b. roles, VAD and target SNR (REQ-202, REQ-204) -----------------
+    roles = {s["source_id"]: s.get("role", "speech") for s in eff["sources"]}
+    speech_idx = [i for i, s in enumerate(src_ids) if roles[s] == "speech"]
+    noise_idx = [i for i, s in enumerate(src_ids) if roles[s] in ("noise", "interference")]
+    dry_vad = {s: vad_segments(dry[i], fs) for i, s in enumerate(src_ids)}
+    ref_trace = {s: delay_trace[(s, rec_ids[ref_idx])] for s in src_ids}
+    speech_window = segments_to_mask(
+        [seg for i in speech_idx
+         for seg in shift_segments_varying(dry_vad[src_ids[i]], ref_trace[src_ids[i]], hop, T)], T)
+    mix_meta: Dict[str, object] = {}
+    target_snr = (resolved.get("mix") or {}).get("target_snr_db")
+    if target_snr is not None and speech_idx and noise_idx and speech_window.any():
+        sp = refs[speech_idx, ref_idx, :].sum(axis=0)[speech_window]
+        nz = refs[noise_idx, ref_idx, :].sum(axis=0)[speech_window]
+        p_s, p_n = float(np.mean(sp ** 2)), float(np.mean(nz ** 2))
+        if p_n > 0 and p_s > 0:
+            g = math.sqrt(p_s / (p_n * 10.0 ** (float(target_snr) / 10.0)))
+            dry[noise_idx] *= g
+            refs[noise_idx] *= g
+            mix_meta["applied_noise_gain_db"] = 20.0 * math.log10(g)
+        nz = refs[noise_idx, ref_idx, :].sum(axis=0)[speech_window]
+        mix_meta["target_snr_db"] = float(target_snr)
+        mix_meta["measured_snr_db"] = 10.0 * math.log10(p_s / max(float(np.mean(nz ** 2)), 1e-30))
+
+    # Acoustic headroom: scale the whole scene (all sources, dry and images) so the
+    # pre-device mixture peak stays below mix.max_peak_dbfs.  SNR and labels are
+    # unchanged; device gain can still clip (that is device behaviour).
+    max_peak = (resolved.get("mix") or {}).get("max_peak_dbfs")
+    if max_peak is not None:
+        peak = float(np.max(np.abs(refs.sum(axis=0))))
+        limit = 10.0 ** (float(max_peak) / 20.0)
+        if peak > limit:
+            g_all = limit / peak
+            dry *= g_all
+            refs *= g_all
+            mix_meta["applied_scene_gain_db"] = 20.0 * math.log10(g_all)
+        mix_meta["max_peak_dbfs"] = float(max_peak)
 
     qc_checks: Dict[str, bool] = {}
     qc_details: Dict[str, object] = {}
     qc_flags: List[str] = []
 
-    # QC: component sum against the independent float32 render path
-    indep = engine.render_scene(state, {s: dry[i].astype(np.float32) for i, s in enumerate(src_ids)})
-    sum_err = 0.0
-    for ci, r in enumerate(rec_ids):
-        a = refs[:, ci, :].sum(axis=0)
-        b = np.zeros(T)
-        n = min(T, len(indep[r]))
-        b[:n] = indep[r][:n]
-        peak = max(float(np.max(np.abs(a))), 1e-12)
-        sum_err = max(sum_err, float(np.max(np.abs(a - b))) / peak)
-    qc_checks["component_sum"] = sum_err <= SUM_TOLERANCE_REL
-    qc_details["component_sum_rel_err"] = sum_err
+    # QC: component sum against the independent float32 render path (static only;
+    # the dynamic path has no independent renderer, which the manifest records)
+    if dynamic:
+        qc_details["component_sum"] = "not_applicable:dynamic_v1"
+    else:
+        indep = engine.render_scene(state, {s: dry[i].astype(np.float32) for i, s in enumerate(src_ids)})
+        sum_err = 0.0
+        for ci, r in enumerate(rec_ids):
+            a = refs[:, ci, :].sum(axis=0)
+            b = np.zeros(T)
+            n = min(T, len(indep[r]))
+            b[:n] = indep[r][:n]
+            peak = max(float(np.max(np.abs(a))), 1e-12)
+            sum_err = max(sum_err, float(np.max(np.abs(a - b))) / peak)
+        qc_checks["component_sum"] = sum_err <= SUM_TOLERANCE_REL
+        qc_details["component_sum_rel_err"] = sum_err
 
     # Clock shifts are a time transform on the channel: mixture and references move together.
     for ci, rec in enumerate(rec_records):
@@ -365,12 +561,17 @@ def simulate_scene(
         for ci, r in enumerate(rec_ids):
             d = directs[(s, r)]
             k = rec_records[ci]["clock_shift_samples"]
-            start = meta["onset_sample"] + int(d.delay_samples) + k
-            end = start + meta["n_samples"]
+            tr = delay_trace[(s, r)]
+            on = meta["onset_sample"]
+            t_on = on // hop
+            near = tr[max(0, t_on - 1): t_on + 2] if len(tr) > 1 else tr
+            start = on + int(np.min(near)) + k
+            end = on + meta["n_samples"] + _delay_at(tr, on + meta["n_samples"] - 1, hop) + k
             pairs.append({
                 "source_id": s, "receiver_id": r,
                 "distance_m": float(d.distance_m),
                 "direct_delay_samples": int(d.delay_samples),
+                "direct_delay_exact_samples": float(d.delay_s) * fs,
                 "doa_az_deg": math.degrees(d.doa_az_rad),
                 "doa_el_deg": math.degrees(d.doa_el_rad),
                 "arrival_start": int(start), "arrival_end": int(end),
@@ -386,6 +587,13 @@ def simulate_scene(
     n_any = int(np.sum(mask.any(axis=0)))
     n_multi = int(np.sum(mask.sum(axis=0) >= 2))
     overlap_ratio = (n_multi / n_any) if n_any else 0.0
+    vad_ref = {
+        s: [list(seg) for seg in shift_segments_varying(
+            dry_vad[s], ref_trace[s], hop, T, extra=rec_records[ref_idx]["clock_shift_samples"])]
+        for s in src_ids
+    }
+    speaker_masks = [segments_to_mask(vad_ref[src_ids[i]], T) for i in speech_idx]
+    overlap_ratio_vad = vad_overlap_ratio(speaker_masks)
     sens_ref = 10.0 ** (float(eff["receivers"][ref_idx].get("sensitivity_db", 0.0)) / 20.0)
     snr_db = {}
     for si, s in enumerate(src_ids):
@@ -408,9 +616,9 @@ def simulate_scene(
         si, ci = src_ids.index(p["source_id"]), rec_ids.index(p["receiver_id"])
         ref = refs[si, ci]
         peak = max(float(np.max(np.abs(ref))), 1e-30)
-        pre = ref[: max(0, p["arrival_start"])]
+        pre = ref[: max(0, p["arrival_start"] - kernel_hw)]
         pre_ok = pre.size == 0 or float(np.max(np.abs(pre))) <= PRE_ARRIVAL_TOLERANCE_REL * peak
-        if abs(first - p["direct_delay_samples"]) > 1 or not pre_ok:
+        if abs(first - p["direct_delay_samples"]) > 1 + kernel_hw or not pre_ok:
             causal_ok = False
             causal_bad.append(f"{p['source_id']}->{p['receiver_id']}")
     qc_checks["label_alignment"] = causal_ok
@@ -453,14 +661,18 @@ def simulate_scene(
             staging.write_wav(name, data32, fs)
             written.append((name, data32, {"role": role, **ids}))
 
+        full = resolved["render"].get("storage_profile", "full") == "full"
         for ci, r in enumerate(rec_ids):
             _wav(f"mixture__{r}.wav", mixture[ci], "mixture", receiver_id=r)
-            _wav(f"noise__{r}.wav", noise[ci], "noise", receiver_id=r)
+            if full:
+                _wav(f"noise__{r}.wav", noise[ci], "noise", receiver_id=r)
         for si, s in enumerate(src_ids):
-            _wav(f"dry__{s}.wav", dry[si], "dry", source_id=s)
+            if full:
+                _wav(f"dry__{s}.wav", dry[si], "dry", source_id=s)
             for ci, r in enumerate(rec_ids):
                 _wav(f"reference__{s}__{r}.wav", refs[si, ci], "reference", source_id=s, receiver_id=r)
-                _wav(f"rir__{s}__{r}.wav", rirs[(s, r)].h, "rir", source_id=s, receiver_id=r)
+                if full:
+                    _wav(f"rir__{s}__{r}.wav", rirs[(s, r)].h, "rir", source_id=s, receiver_id=r)
 
         # QC: WAV round trip (format, shape, exact values)
         rt_ok = True
@@ -521,6 +733,7 @@ def simulate_scene(
                 "profile": resolved["render"]["profile"],
                 "fs": fs, "n_samples": int(T), "n_dry": int(n_dry),
                 "duration_s": duration_s, "tail_policy": resolved["render"]["tail"],
+                "storage_profile": resolved["render"].get("storage_profile", "full"),
                 "time_origin": "scene_start",
                 "reference_receiver": rec_ids[ref_idx],
                 "approximations": approximations,
@@ -532,13 +745,22 @@ def simulate_scene(
                     "gain_db", "noise_floor_dbfs", "clip_threshold_dbfs", "sensitivity_db", "agc_enabled")}}
                 for i, rec in enumerate(rec_records)
             ],
-            "geometry": {"pairs": pairs, "n_obstacles": len(obstacles)},
+            "geometry": {"pairs": pairs, "n_obstacles": len(obstacles),
+                         **({"dynamic": dyn_info} if dynamic else {})},
             "labels": {
                 "reference_receiver": rec_ids[ref_idx],
                 "activity": activity,
                 "overlap_ratio": overlap_ratio,
                 "snr_db": snr_db,
+                "roles": roles,
+                "vad": vad_ref,
+                "overlap_ratio_vad": overlap_ratio_vad,
+                **({"doa_trace": {s: doa_trace[(s, rec_ids[ref_idx])] for s in src_ids}} if dynamic else {}),
+                "mix": mix_meta,
                 "definitions": {
+                    "vad": "1 ms frames of the dry stem with RMS > max frame RMS - 40 dB, shifted to the reference receiver",
+                    "overlap_ratio_vad": "among speech sources: VAD samples with >=2 speakers / with >=1 speaker",
+                    "mix": "target SNR = speech vs noise/interference references at the reference receiver over speech VAD (exact, pre-device)",
                     "activity": "placed dry segment shifted by direct delay (+clock shift) at the reference receiver",
                     "overlap_ratio": "samples with >=2 active sources / samples with >=1 active source",
                     "snr_db": "P(sensitivity*reference) / P(device self-noise, pre-gain) over the source's activity window",
@@ -562,7 +784,7 @@ def simulate_scene(
             "source_count": S,
             "channel_count": C,
             "audio_files": [staging.rel(f"mixture__{r}.wav") for r in rec_ids],
-            "rir_files": [staging.rel(f"rir__{s}__{r}.wav") for s in src_ids for r in rec_ids],
+            "rir_files": [staging.rel(f"rir__{s}__{r}.wav") for s in src_ids for r in rec_ids] if full else [],
             "metadata_json_path": staging.rel("params.json"),
             "acoustic_summary": {
                 "RT60": acoustic_summary.rt60_measured_s,

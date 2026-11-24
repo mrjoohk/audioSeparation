@@ -1,0 +1,43 @@
+{
+ "proxy_domain_note": "proxy-real sessions are simulated (unknown materials, band reverb, 4 kHz device)",
+ "acceptance_rt60_0_5": {
+  "n": 99,
+  "median_s": 0.45864456541207843,
+  "within_0_075": true
+ },
+ "profile": {
+  "id": "calib-4b1adc6bfc",
+  "rt60_median_s": 0.3483696862011204,
+  "parameter_ranges": {
+   "rt60_s": [
+    0.15077490725040296,
+    0.7549916286290288
+   ]
+  }
+ },
+ "closed_loop": [
+  {
+   "iteration": 0,
+   "kl": 0.2115370183125227,
+   "regen_median_s": 0.2855486236499386,
+   "target_median_s": 0.3483696862011204
+  },
+  {
+   "iteration": 1,
+   "kl": 0.15121550408481196,
+   "regen_median_s": 0.3189092448733097,
+   "target_median_s": 0.4202472698645803
+  },
+  {
+   "iteration": 2,
+   "kl": 0.05945983334281918,
+   "regen_median_s": 0.3486708853947486,
+   "target_median_s": 0.4409467957973382
+  }
+ ],
+ "final_kl": 0.05945983334281918,
+ "req302_kl_le_0_1": true,
+ "calibrated_targets_median_s": 0.4409467957973382,
+ "n_measured": 300,
+ "kl_bins": "10 bins on 0-2 s"
+}

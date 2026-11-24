@@ -1,0 +1,30 @@
+{
+ "n_accepted": 150,
+ "n_rejected": 0,
+ "rejected_by_reason": {},
+ "per_split": {
+  "test": 30,
+  "train": 120
+ },
+ "per_tier": {
+  "medium": 66,
+  "hard": 84
+ },
+ "tier_overlap": {
+  "medium": {
+   "n_scenes": 66,
+   "target": 0.2,
+   "cumulative_overlap": 0.26500842713304545,
+   "within_5pct": false
+  },
+  "hard": {
+   "n_scenes": 84,
+   "target": 0.5,
+   "cumulative_overlap": 0.4129231440325504,
+   "within_5pct": false
+  }
+ },
+ "snr_abs_error_db_max": 3.552713678800501e-15,
+ "leakage": [],
+ "clipped_in_release": 0
+}

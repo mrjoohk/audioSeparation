@@ -35,6 +35,11 @@ from simulator.uf.w151_config import (
 from simulator.scene_io import RENDERER_VERSION, canonical_json, sha256_file
 
 RENDER_PROFILE = "static_v1"
+RENDER_PROFILES = ("static_v1", "dynamic_v1")
+# "full": mixture, references, noise, dry, RIRs.  "training": mixture + references only
+# (F-11: store what training needs; noise/dry/RIR are diagnostics).
+STORAGE_PROFILES = ("full", "training")
+SOURCE_ROLES = ("speech", "noise", "interference")
 STATIC_MOTION_TYPES = ("static", "array_mounted")
 SUPPORTED_IMPAIRMENTS = ("none", "bandwidth", "codec", "packet_loss")
 RECEIVER_DEVICE_DEFAULTS = {
@@ -56,7 +61,7 @@ _NON_RENDER_KEYS = ("scene_id", "output_dir")
 KNOWN_TOP_LEVEL_KEYS = frozenset({
     "scene_id", "seed", "schema_version", "room", "materials", "sources", "receivers",
     "motion", "impairments", "output_dir", "sample_rate", "ism_order", "speed_of_sound",
-    "render", "qc", "reference_receiver",
+    "render", "qc", "reference_receiver", "mix",
 })
 
 
@@ -108,7 +113,12 @@ def resolve_config(raw: dict) -> dict:
     render.setdefault("profile", RENDER_PROFILE)
     render.setdefault("tail", "keep")
     render.setdefault("allow_static_approximation", False)
+    render.setdefault("storage_profile", "full")
+    render.setdefault("fractional_delay", False)
+    render.setdefault("band_reverb", False)
     r["render"] = render
+
+    r["mix"] = r.get("mix") or {}
 
     qc = r.get("qc") or {}
     qc.setdefault("fail_on_clip", False)
@@ -124,6 +134,7 @@ def resolve_config(raw: dict) -> dict:
             src["position"] = position_to_list(src["position"], f"sources[{i}].position")
         src["motion"] = _motion_with_defaults(src)
         src.setdefault("onset_s", 0.0)
+        src.setdefault("role", "speech")
     for i, rec in enumerate(r.get("receivers") or []):
         if rec.get("position") is not None:
             rec["position"] = position_to_list(rec["position"], f"receivers[{i}].position")
@@ -152,8 +163,11 @@ def check_profile(resolved: dict) -> Tuple[List[str], List[str], List[str]]:
     render = resolved.get("render", {})
     allow_approx = bool(render.get("allow_static_approximation", False))
 
-    if render.get("profile", RENDER_PROFILE) != RENDER_PROFILE:
-        errors.append(f"render.profile {render.get('profile')!r} is not supported (only {RENDER_PROFILE!r}).")
+    profile = render.get("profile", RENDER_PROFILE)
+    if profile not in RENDER_PROFILES:
+        errors.append(f"render.profile {profile!r} is not supported ({RENDER_PROFILES}).")
+    if render.get("storage_profile", "full") not in STORAGE_PROFILES:
+        errors.append(f"render.storage_profile must be one of {STORAGE_PROFILES}.")
     if render.get("tail", "keep") not in ("keep", "trim"):
         errors.append(f"render.tail must be 'keep' or 'trim', got {render.get('tail')!r}.")
 
@@ -167,27 +181,57 @@ def check_profile(resolved: dict) -> Tuple[List[str], List[str], List[str]]:
             mtype = (ent.get("motion") or {}).get("type", "static")
             if mtype not in STATIC_MOTION_TYPES:
                 moving.append(f"{ent.get(key)}({mtype})")
-    if moving:
+    if moving and profile == "dynamic_v1":
+        pass
+    elif moving:
         if allow_approx:
             approx.append("moving entities rendered at tick 0: " + ", ".join(moving))
         else:
             errors.append(
                 "moving entities are outside the static_v1 profile: " + ", ".join(moving)
-                + " (set render.allow_static_approximation=true to render tick 0)."
+                + " (use render.profile=dynamic_v1, or render.allow_static_approximation=true "
+                "to render tick 0)."
             )
 
+    from simulator.receiver_models import PATTERNS
     for rec in resolved.get("receivers") or []:
-        if str(rec.get("pattern", "omni")) != "omni":
-            errors.append(
-                f"receiver {rec.get('receiver_id')}: pattern {rec.get('pattern')!r} is not supported "
-                "(directivity must be applied per source path; static_v1 is omni-only)."
-            )
-        if rec.get("is_binaural") or (rec.get("motion") or {}).get("type") == "binaural":
-            errors.append(f"receiver {rec.get('receiver_id')}: binaural rendering is not supported.")
+        if str(rec.get("pattern", "omni")) not in PATTERNS:
+            errors.append(f"receiver {rec.get('receiver_id')}: pattern {rec.get('pattern')!r} not in {PATTERNS}.")
+        if rec.get("binaural") and str(rec.get("pattern", "omni")) != "omni":
+            errors.append(f"receiver {rec.get('receiver_id')}: binaural receivers take no pattern.")
+        hrtf = rec.get("hrtf")
+        if hrtf is not None:
+            if not rec.get("binaural"):
+                errors.append(f"receiver {rec.get('receiver_id')}: 'hrtf' needs 'binaural': true.")
+            elif not isinstance(hrtf, dict) or not hrtf.get("sofa") or not os.path.isfile(str(hrtf["sofa"])):
+                errors.append(f"receiver {rec.get('receiver_id')}: hrtf.sofa must be an existing SOFA file.")
+        if rec.get("is_binaural"):
+            errors.append(f"receiver {rec.get('receiver_id')}: use 'binaural': true.")
+
+    roles = [str(s.get("role", "speech")) for s in resolved.get("sources") or []]
+    bad_roles = sorted({r for r in roles if r not in SOURCE_ROLES})
+    if bad_roles:
+        errors.append(f"source role(s) {bad_roles} not in {SOURCE_ROLES}.")
+    target_snr = (resolved.get("mix") or {}).get("target_snr_db")
+    if target_snr is not None:
+        if "speech" not in roles or not any(r in ("noise", "interference") for r in roles):
+            errors.append("mix.target_snr_db needs at least one speech and one noise/interference source.")
 
     imp_type = (resolved.get("impairments") or {}).get("type", "none")
     if imp_type not in SUPPORTED_IMPAIRMENTS:
         errors.append(f"impairments.type {imp_type!r} not in {SUPPORTED_IMPAIRMENTS}.")
+
+    from simulator.uf.w112_material import MaterialDB
+    db = MaterialDB()
+    for k, v in (resolved.get("materials") or {}).items():
+        if k in ("stochastic_variation", "variation_sigma"):
+            continue
+        if isinstance(v, dict):
+            a = v.get("alpha")
+            if not (isinstance(a, (list, tuple)) and len(a) == 6 and all(0.0 <= float(x) <= 1.0 for x in a)):
+                errors.append(f"materials.{k}: alpha must be 6 values in [0, 1].")
+        elif str(v) not in db:
+            errors.append(f"materials.{k}: unknown material {v!r}.")
 
     ref = resolved.get("reference_receiver")
     rec_ids = [r.get("receiver_id") for r in resolved.get("receivers") or []]
@@ -449,7 +493,10 @@ def preflight(raw: dict) -> dict:
     n_dry = int(round(duration * fs))
     L = int(rir_s * fs)
     T = n_dry + L - 1 if resolved["render"]["tail"] == "keep" else n_dry
-    n_floats = 2 * C * T + S * C * T + S * n_dry + S * C * L
+    if resolved["render"].get("storage_profile", "full") == "training":
+        n_floats = C * T + S * C * T
+    else:
+        n_floats = 2 * C * T + S * C * T + S * n_dry + S * C * L
     report["workload"] = {
         "n_sources": S, "n_receivers": C, "n_pairs": S * C,
         "duration_s": duration, "sabine_rt60_s": rt60, "rir_length_s": rir_s,

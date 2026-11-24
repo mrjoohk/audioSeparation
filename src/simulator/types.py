@@ -288,6 +288,7 @@ class LateReverbSpec:
     rt60_s: float
     mixing_time_ms: float
     seed: int
+    level_scale: float = 1.0   # mean wall reflection coefficient; 0 → no late reverb
 
 
 @dataclass

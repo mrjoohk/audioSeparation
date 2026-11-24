@@ -90,16 +90,20 @@ def test_fingerprint_ignores_display_fields_and_defaults():
     assert render_fingerprint(a) != render_fingerprint(b)
 
 
-def test_profile_rejects_directivity_and_motion():
-    cfg = resolve_config({
+def test_profile_gate_for_patterns_and_motion():
+    base = {
         "scene_id": "p", "seed": 0,
         "room": {"type": "shoebox", "dimensions": {"L": 5, "W": 4, "H": 3}},
         "sources": [{"source_id": "s0", "motion": {"type": "random_walk"}}],
-        "receivers": [{"receiver_id": "r0", "position": [2, 1, 2], "pattern": "cardioid"}],
-    })
-    errors, approx, _ = check_profile(cfg)
+        "receivers": [{"receiver_id": "r0", "position": [2, 1, 2], "pattern": "shotgun"}],
+    }
+    errors, _, _ = check_profile(resolve_config(base))
     assert any("moving" in e for e in errors)
-    assert any("cardioid" in e for e in errors)
+    assert any("shotgun" in e for e in errors)
+    ok = dict(base, render={"profile": "dynamic_v1"},
+              receivers=[{"receiver_id": "r0", "position": [2, 1, 2], "pattern": "cardioid"}])
+    errors, _, _ = check_profile(resolve_config(ok))
+    assert errors == []
 
 
 def test_preflight_reports_workload_and_errors():

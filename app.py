@@ -732,7 +732,10 @@ with gr.Blocks(title="W100000 Spatial Audio Generator") as demo:
                 # ---- Left panel: parameters --------------------------------
                 with gr.Column(scale=1):
                     gr.Markdown("#### Meeting Setup")
-                    zoom_n_participants = gr.Slider(2, 12, value=4, step=1, label="Participants")
+                    zoom_n_participants = gr.Slider(
+                        2, 12, value=4, step=1, label="Participants",
+                        info="Preview uses this count; Generate & Save N draws each scenario from n−2..n+2 (2–12).",
+                    )
                     with gr.Row():
                         zoom_room_size = gr.Dropdown(
                             ["auto", "small", "medium", "large"], value="auto", label="Room Size"

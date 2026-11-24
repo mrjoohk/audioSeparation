@@ -1,0 +1,151 @@
+{
+ "schema_version": "1.0.0",
+ "kind": "train_masknet",
+ "created_at": "2026-11-21T08:27:42.148109+00:00",
+ "seed": 0,
+ "config": {
+  "hidden": 256,
+  "layers": 2,
+  "n_spk": 2,
+  "nfft": 512,
+  "hop": 128,
+  "dropout": 0.1,
+  "steps": 4000,
+  "batch": 8,
+  "seg_s": 4.0,
+  "lr": 0.001,
+  "augment": null
+ },
+ "data": {
+  "name": "req401-train",
+  "version": "1.0.0",
+  "release_manifest_sha256": "745520cc0eb5155495a91b47399e83a3d0f5de6fb4ec946ffeea4daf3122f2b0",
+  "split": "train",
+  "n_scenes": 1500
+ },
+ "checkpoint": {
+  "path": "masknet.pt",
+  "sha256": "9ced3aae8023e0c26f958ae8bfa953d4cdf4b2ded355342a4438a0e61db7fb58"
+ },
+ "metrics": {
+  "train_log": [
+   {
+    "step": 1,
+    "si_sdr_db": -0.051528964191675186,
+    "elapsed_s": 0.7751390933990479
+   },
+   {
+    "step": 200,
+    "si_sdr_db": 0.3373481035232544,
+    "elapsed_s": 100.06078219413757
+   },
+   {
+    "step": 400,
+    "si_sdr_db": 1.156063437461853,
+    "elapsed_s": 198.99821615219116
+   },
+   {
+    "step": 600,
+    "si_sdr_db": 3.1078643798828125,
+    "elapsed_s": 298.434205532074
+   },
+   {
+    "step": 800,
+    "si_sdr_db": 2.0721542835235596,
+    "elapsed_s": 397.4832363128662
+   },
+   {
+    "step": 1000,
+    "si_sdr_db": 0.9317291975021362,
+    "elapsed_s": 496.3763737678528
+   },
+   {
+    "step": 1200,
+    "si_sdr_db": 5.428563594818115,
+    "elapsed_s": 594.7609963417053
+   },
+   {
+    "step": 1400,
+    "si_sdr_db": 3.1840202808380127,
+    "elapsed_s": 693.5473017692566
+   },
+   {
+    "step": 1600,
+    "si_sdr_db": 5.968898773193359,
+    "elapsed_s": 792.7744474411011
+   },
+   {
+    "step": 1800,
+    "si_sdr_db": 5.356856822967529,
+    "elapsed_s": 891.6541047096252
+   },
+   {
+    "step": 2000,
+    "si_sdr_db": 2.2609546184539795,
+    "elapsed_s": 990.4681189060211
+   },
+   {
+    "step": 2200,
+    "si_sdr_db": 6.94413423538208,
+    "elapsed_s": 1089.4740550518036
+   },
+   {
+    "step": 2400,
+    "si_sdr_db": 8.152436256408691,
+    "elapsed_s": 1188.5141496658325
+   },
+   {
+    "step": 2600,
+    "si_sdr_db": 7.483065605163574,
+    "elapsed_s": 1287.9564015865326
+   },
+   {
+    "step": 2800,
+    "si_sdr_db": 9.285503387451172,
+    "elapsed_s": 1387.2482256889343
+   },
+   {
+    "step": 3000,
+    "si_sdr_db": 9.856000900268555,
+    "elapsed_s": 1486.2460525035858
+   },
+   {
+    "step": 3200,
+    "si_sdr_db": 9.604927062988281,
+    "elapsed_s": 1585.046087026596
+   },
+   {
+    "step": 3400,
+    "si_sdr_db": 7.095090389251709,
+    "elapsed_s": 1684.0516963005066
+   },
+   {
+    "step": 3600,
+    "si_sdr_db": 7.911541938781738,
+    "elapsed_s": 1782.7372303009033
+   },
+   {
+    "step": 3800,
+    "si_sdr_db": 9.120556831359863,
+    "elapsed_s": 1881.422384262085
+   },
+   {
+    "step": 4000,
+    "si_sdr_db": 10.887577056884766,
+    "elapsed_s": 1979.6791062355042
+   }
+  ],
+  "train_time_s": 1979.7175543308258
+ },
+ "evaluator": null,
+ "code": {
+  "commit": "fd867f9ef6ccf2639679aba72d13ccdcef20f78c",
+  "dirty": true
+ },
+ "environment": {
+  "python": "3.14.8",
+  "numpy": "2.5.5",
+  "scipy": "1.18.1",
+  "platform": "Windows-11-10.0.26300-SP0"
+ }
+}

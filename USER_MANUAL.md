@@ -928,14 +928,101 @@ A. ISM과 재질 계산은 결정론적입니다. `motion` 파라미터가 있�
 
 ## 11. 알려진 제한사항
 
-| 번호 | 제한사항 | 해결 예정 |
-|------|----------|-----------|
-| L-01 | BRIR은 합성 HRTF 사용 (CIPIC DB 미연동) | v1.2 |
-| L-02 | 동적 씬 RIR은 1/r 임펄스 근사 | v1.2 |
-| L-03 | Mesh 방(OBJ/STL) ISM 미지원 | v1.3 |
-| L-04 | GUI에서 실제 음성 파일 입력 미지원 | v1.2 |
-| L-05 | GPU 가속 없음 (CPU만) | v1.3 |
-| L-06 | Zoom 씬에서 TV 반사는 obstacle로 처리 (별도 반사 모델 없음) | v1.2 |
+2026-11-22 갱신. 진척과 차단 항목의 정본은 [reports/progress/implementation_roadmap.md](reports/progress/implementation_roadmap.md)다.
+
+| 번호 | 제한사항 | 상태 |
+|------|----------|------|
+| L-01 | 바이노럴 기본값은 합성 구형 머리. 측정 HRTF는 수음기에 `"hrtf": {"sofa": "<경로>"}`로 지정(HUTUBS 96명, 방향은 최근접 측정점, 보간 없음). 계획기는 `hrtf_sofa` 목록에서 피험자를 무작위 선택 | 해소(보간은 미구현) |
+| L-02 | 이동 렌더(`dynamic_v1`)는 틱 단위 구간 정적 근사, 도플러 미모델링 | 설계 결정 |
+| L-03 | Mesh 방(OBJ/STL) ISM 미지원 | 미구현 |
+| L-04 | 실제 코퍼스는 `scripts/import_external.py`로 등록(LibriSpeech dev/test-clean, DEMAND 16 kHz). 원본과 라이브러리는 `data/external/`(버전 관리 제외). 합성 대리 자산은 단위 시험용으로 유지 | 해소 |
+| L-05 | GPU 학습(RTX 2060 SUPER, PyTorch `2.15.0+cu132`). Smart App Control이 꺼진 뒤 CUDA 빌드가 동작한다(앞서 WinError 4551로 차단됐었다). 증강이 CPU 병목이라 `--loader-threads 6`으로 배치를 스레드에서 미리 만든다. 30,000 스텝(배치 16)이 모델당 1.3–1.8시간 걸린다. 알려진 문제: 이 torch/cuDNN 9.26 조합에서 드롭아웃이 있는 다층 LSTM을 학습한 프로세스는 종료 처리 중 0xC0000409로 끝난다(출력 저장 뒤). 그래서 스크립트는 CUDA 학습 단계가 끝나면 종료 처리를 건너뛰고 0으로 끝낸다 | 해결 |
+| L-06 | ASR은 `WhisperAsrBackend`(Whisper small.en, MIT, 가중치는 `data/external/whisper`). 다른 인식기는 `CommandAsrBackend`로 연결 | 해소 |
+| L-07 | 예전에는 애플리케이션 제어 정책 때문에 이 PC에서 Gradio가 로드되지 않았다. Smart App Control이 꺼진 뒤 `.claude/launch.json`의 `gui` 구성(포트 7860)으로 GUI를 띄워 확인했다 | 해결 |
+| L-08 | 이 PC에서 `data/external/`(약 74 GB)은 `E:\audioSeperation\data\external`을 가리키는 디렉터리 정션이다. C 드라이브 공간 부족으로 2026-11-22에 옮겼다. 코드 경로는 그대로다. 다른 PC에서는 보통 폴더로 두면 된다 | 참고 |
+
+---
+
+## 12. 데이터셋·학습·평가 파이프라인 (W2–W4)
+
+```powershell
+# W2: 사전 분포(configs/scenario_prior.yaml) → 렌더 → QC → 버전 릴리스
+.venv/Scripts/python.exe scripts/make_dataset.py --assets data/assets --out data/render --version 0.1.0 --train 800 --val 100 --test 100 --workers 8
+# W3/W4: 첫 종단 간 실험(학습 → 원음/기준/후보 비교)
+.venv/Scripts/python.exe scripts/run_baseline_experiment.py --train 120 --test 30 --workers 8
+# W3: 도메인 격차(커리큘럼·보정·증강·CORAL, 대리 실측 영역)와 요인 제거 대시보드
+.venv/Scripts/python.exe scripts/run_domain_gap_experiment.py --workers 8
+# W4: 릴리스 게이트(종료 코드 0 통과 / 1 실패 / 2 보류)
+.venv/Scripts/python.exe scripts/release_gate.py --comparison reports/experiments/domain_gap_v1/eval_proxy_test/comparison.json --candidate M2_aug_coral --fixed-baseline M0_baseline
+# 신경 분리기: REQ-401 1 h 벤치마크, REQ-303 강건성, REQ-302 폐루프 보정
+.venv/Scripts/python.exe scripts/run_neural_benchmark.py --steps 4000 --workers 8
+.venv/Scripts/python.exe scripts/run_robustness_experiment.py --steps 3000 --workers 8
+.venv/Scripts/python.exe scripts/run_calibration_experiment.py --workers 8
+# 외부 자료 등록(사용 허가를 받아 data/external/ 아래에 내려받은 원본)
+.venv/Scripts/python.exe scripts/import_external.py librispeech
+.venv/Scripts/python.exe scripts/import_external.py demand
+.venv/Scripts/python.exe scripts/import_external.py hutubs
+# 실데이터 실험: AMI 등록부·분할·보정 프로파일 → 학습 3종 → Whisper WER, 미관측 배열, AMI dev/blind_test
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_build
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_base --steps 20000
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_robust --steps 20000
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_cal --steps 20000
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py asr
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py heldout
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_eval
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_adapt
+# v2: train-clean-100 + dev-clean(291명)으로 다시 학습(GPU). 결과는 reports/experiments/real_v2/
+# AMI는 dev만 평가한다(blind_test는 v1 후보가 이미 한 번 사용).
+.venv/Scripts/python.exe scripts/import_external.py librispeech
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_base --tag v2 --n-train 1800 --device cuda --batch 16 --steps 30000 --loader-threads 6
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py asr --tag v2
+# 우세 화자 게이트 WER(단어 타임스탬프, AMI dev·LibriSpeech만; blind_test는 열지 않음)
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py asr_gate --tag v2
+# REQ-305 하위 태스크 WER 요인표(저장된 결과만 읽음) → reports/experiments/req305/attribution.md
+.venv/Scripts/python.exe scripts/req305_attribution.py
+# 두 번째 blind(blind2): TNO 회의만(dev와 방·화자 분리). 등록부 configs/real_sessions_ami_blind2.csv
+# eval은 dev 1위 모델을 고정해 한 번만 연다(reports/experiments/ami_blind2/access_log.json). 회의를 더 받으면 전체를 한 번 다시 평가할 수 있다
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_blind2_build
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_blind2_eval
+# v3(설계 §16): 실측 AMI ES·IS 학습 회의 16개로 학습 장면을 만들고(dev·blind와 화자 분리, TNO 방 없음),
+# 실측 50 %+합성 50 %(mix)와 실측 100 %(real)를 학습한 뒤 dev SI-SDRi로 후보를 고른다
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_train_build --tag v3
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_v3 --tag v3 --variant mix --device cuda --steps 30000 --batch 16 --loader-threads 6
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_v3 --tag v3 --variant real --device cuda --steps 30000 --batch 16 --loader-threads 6
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_v3_dev --tag v3
+# blind3: TS3009~TS3012 16세션. 후보를 고정해 한 번만 연다(reports/experiments/ami_blind3/access_log.json가 있으면 거부)
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_blind3_build
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py ami_blind3_eval
+# WER 지표 진단(설계 §17, dev만): 완벽 분리(oracle)를 더해 시간순 결합 WER과 cpWER(화자별 최소 순열)을 함께 잰다
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py asr_diag_dev --tag v3 --asr-device cuda
+# blind4(설계 §18): 새 장소 NOTSOFAR-1 50회의(§18.1 개정)(E:\audioSeperation\data\external\notsofar, 회의마다 mc_plaza_0 7채널).
+# 사전 등록 reports/experiments/blind4_notsofar/preregistration.json. 판정은 configs/decision_rules.yaml(cpWER)을 그대로 적용하고 한 번만 연다
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py blind4_build
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py blind4_eval --asr-device cuda
+# blind4_eval 뒤 result.json만 다시 계산(저장된 eval/comparison.json에서, 오디오·모델 사용 없음, 다시 열지 않음)
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py blind4_finalize
+# v4(설계 §19): NOTSOFAR train 71회의로 학습, dev1 36회의로 선택, 새 방 4개 52회의(blind5)에서 한 번 판정.
+# 자료 E:\audioSeperation\data\external\notsofar_v4\{train,dev1,eval}, 사전 등록 reports/experiments/blind5_notsofar/preregistration.json
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py v4_build
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_v4 --variant nsf --steps 30000 --batch 16 --device cuda --loader-threads 6
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py train_v4 --variant real --steps 30000 --batch 16 --device cuda --loader-threads 6
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py v4_dev_select --asr-device cuda
+.venv/Scripts/python.exe scripts/run_real_data_experiments.py blind5_eval --asr-device cuda
+# 처리량·파일럿, 진척 막대, 요구사항 추적표
+.venv/Scripts/python.exe scripts/bench_throughput.py --workers 8
+.venv/Scripts/python.exe scripts/progress_report.py
+.venv/Scripts/python.exe scripts/trace_check.py --strict
+```
+
+| 모듈 | 역할 |
+| --- | --- |
+| `src/datagen` | 자산 라이브러리, 시나리오 계획기(목표 SNR·중첩·이벤트·보정 RT60·HRTF 피험자), QC 게이트, 불변 릴리스, 외부 코퍼스 가져오기(`external.py`) |
+| `src/datatools` | 매니페스트 로더, VAD, 분할 누수 검사, 실측 세션 등록부, AMI 회의 → 중첩 장면(`ami.py`), 평가 지표 |
+| `src/simulator/hrtf_db.py` | SOFA 측정 HRIR 읽기, 시작점 정렬, 최근접 방향 조회 |
+| `src/training` | DSP(SRP-PHAT, 지연합), 마스크 모델, 신경 분리기(BLSTM, PIT SI-SDR), 증강, CORAL, 보정, 커리큘럼, 실험 매니페스트 |
+| `src/evaluation` | 위치·추적, DER·화자 분할, ASR 연동, 시스템 비교, 벤치마크 고정, 요인 제거, 릴리스 게이트 |
+
+새 렌더 옵션: `render.profile`(`static_v1`/`dynamic_v1`), `render.fractional_delay`, `render.band_reverb`, `render.storage_profile`(`full`/`training`), `mix.target_snr_db`, `mix.max_peak_dbfs`, 수음기 `pattern`·`yaw_deg`·`binaural`, 음원 `role`(`speech`/`noise`/`interference`), 재질 `{"alpha": [6개 대역]}`.
 
 ---
 

@@ -1,0 +1,60 @@
+{
+ "schema_version": "1.0.0",
+ "kind": "train_mask_model",
+ "created_at": "2026-11-21T07:25:58.108644+00:00",
+ "seed": 0,
+ "config": {
+  "context": 2,
+  "ridge": 1.0,
+  "irm_clip": 0.02,
+  "n_freq": 257,
+  "normalize": true,
+  "augment": {
+   "gain_db": [
+    -6.0,
+    6.0
+   ],
+   "channel_mismatch_db": 1.0,
+   "tilt_db": [
+    -6.0,
+    6.0
+   ],
+   "bandlimit_prob": 0.3,
+   "bandlimit_hz": [
+    3400.0,
+    7000.0
+   ],
+   "noise_prob": 0.5,
+   "noise_snr_db": [
+    10.0,
+    30.0
+   ]
+  },
+  "n_augment": 2
+ },
+ "data": {
+  "name": "gap-src",
+  "version": "1.0.0",
+  "release_manifest_sha256": "3a7bf59f8e42f23aa44e14e592b8f75220f433e409aba31ca3010cf8146c38d6",
+  "split": "train",
+  "n_scenes": 100,
+  "scene_ids_sha256": "15f3accb66f6f4a5d867f8acc341ab329c18f7b8e5961a45acd75db64b571769"
+ },
+ "checkpoint": {
+  "path": "mask_model.npz",
+  "sha256": "a674b64c1f4dcaa5448807bdffcec4f1824a88183df885d9fb4c317bc73e8a99",
+  "n_frames": 715956
+ },
+ "metrics": null,
+ "evaluator": null,
+ "code": {
+  "commit": "fd867f9ef6ccf2639679aba72d13ccdcef20f78c",
+  "dirty": true
+ },
+ "environment": {
+  "python": "3.14.8",
+  "numpy": "2.5.5",
+  "scipy": "1.18.1",
+  "platform": "Windows-11-10.0.26300-SP0"
+ }
+}

@@ -40,6 +40,7 @@ _STANDARD_MATERIALS: dict = {
     "wood":          [0.15, 0.11, 0.10, 0.07, 0.06, 0.07],
     "acoustic_tile": [0.15, 0.25, 0.50, 0.80, 0.90, 0.80],
     "default":       [0.10, 0.10, 0.10, 0.10, 0.10, 0.10],
+    "anechoic":      [1.00, 1.00, 1.00, 1.00, 1.00, 1.00],   # fully absorbing (tests, REQ-W04)
 }
 
 _STANDARD_SIGMA: list = [0.05] * 6

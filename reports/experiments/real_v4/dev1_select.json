@@ -1,0 +1,111 @@
+{
+ "rule": "lowest dev1 session-mean cpWER among candidates whose dev1 session-mean SI-SDRi minus v2-base is > 0; ties broken by higher SI-SDRi",
+ "candidates": {
+  "v4-nsf": {
+   "cpwer": 0.7823496455406317,
+   "n_sessions": 15,
+   "si_sdri_vs_base": {
+    "n_sessions": 15,
+    "mean_diff": 1.8275100176326797,
+    "ci95": [
+     1.0694827364228217,
+     2.5117456437822496
+    ]
+   },
+   "eligible": true
+  },
+  "v4-real": {
+   "cpwer": 0.5997242290069884,
+   "n_sessions": 15,
+   "si_sdri_vs_base": {
+    "n_sessions": 15,
+    "mean_diff": 5.262639982266638,
+    "ci95": [
+     4.314122513472305,
+     6.152893707088871
+    ]
+   },
+   "eligible": true
+  },
+  "v3-real": {
+   "cpwer": 0.698478684499968,
+   "n_sessions": 15,
+   "si_sdri_vs_base": {
+    "n_sessions": 15,
+    "mean_diff": 1.873340648813085,
+    "ci95": [
+     0.8780260127253571,
+     2.868209607318228
+    ]
+   },
+   "eligible": true
+  },
+  "v3-mix": {
+   "cpwer": 0.8326560931827591,
+   "n_sessions": 15,
+   "si_sdri_vs_base": {
+    "n_sessions": 15,
+    "mean_diff": 1.8533805830165877,
+    "ci95": [
+     1.2268456688278537,
+     2.6185626597103226
+    ]
+   },
+   "eligible": true
+  }
+ },
+ "selected": "v4-real",
+ "selected_sha256": "5554f37d609e275a06cbe428fd5653ebd59d30a8acf3e019049a4dca3be58402",
+ "means": {
+  "unprocessed": {
+   "si_sdri_db": 0.0,
+   "der": 0.8910344954424108,
+   "wer": 0.37824658264779226,
+   "wer_gated": 0.37824658264779226,
+   "cpwer": 0.8599352022491029,
+   "cpwer_gated": 0.8599352022491029
+  },
+  "v2-base": {
+   "si_sdri_db": -0.6946384213488768,
+   "der": 0.6197045114408125,
+   "wer": 0.8467752309656881,
+   "wer_gated": 0.7519810926135323,
+   "cpwer": 0.8609672910727187,
+   "cpwer_gated": 0.8117670332802145
+  },
+  "v4-nsf": {
+   "si_sdri_db": 1.0889932763057955,
+   "der": 0.5875499340226203,
+   "wer": 0.7443442361718099,
+   "wer_gated": 0.5913334582235866,
+   "cpwer": 0.7970310655147118,
+   "cpwer_gated": 0.7583826050699247
+  },
+  "v4-real": {
+   "si_sdri_db": 4.376783898657401,
+   "der": 0.3200831286687422,
+   "wer": 0.6176907557182068,
+   "wer_gated": 0.5047064945081771,
+   "cpwer": 0.6198842754107374,
+   "cpwer_gated": 0.5577304280508181
+  },
+  "v3-real": {
+   "si_sdri_db": 0.9323091075058778,
+   "der": 0.42926767896743095,
+   "wer": 0.6404777000704373,
+   "wer_gated": 0.5174270515663691,
+   "cpwer": 0.7115820789722856,
+   "cpwer_gated": 0.6603275079382144
+  },
+  "v3-mix": {
+   "si_sdri_db": 1.2579786846571053,
+   "der": 0.545068119249939,
+   "wer": 0.8561494317342528,
+   "wer_gated": 0.7246096459433699,
+   "cpwer": 0.8365541917229298,
+   "cpwer_gated": 0.7386043731374566
+  }
+ },
+ "n_scenes": 473,
+ "unprocessed_cpwer": 0.866200535706506
+}

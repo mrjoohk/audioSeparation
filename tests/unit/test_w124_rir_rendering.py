@@ -480,3 +480,13 @@ def test_image_sources_never_precede_direct_path():
     expected = sorted([(-1.0, 1.2, 1.3), (9.0, 1.2, 1.3), (1.0, -1.2, 1.3),
                        (1.0, 4.8, 1.3), (1.0, 1.2, -1.3), (1.0, 1.2, 6.7)])
     assert first == expected
+
+
+def test_late_tail_never_precedes_direct_path():
+    """Distant source in an absorptive room: direct delay (7 m ≈ 327 samples) exceeds
+    the mixing time (16 ms = 256 samples).  The tail must start after the direct sound."""
+    dp = _make_direct_path(distance_m=7.0, fs=16000, attenuation=1 / 7.0)
+    refl = _make_reflection_data(rt60_s=0.2, mixing_time_ms=16.0, seed=3)
+    rir = generate_static_rir(dp, refl, _make_no_occlusion(), fs=16000)
+    assert np.all(rir.h[: dp.delay_samples] == 0.0)
+    assert int(np.flatnonzero(rir.h)[0]) == dp.delay_samples

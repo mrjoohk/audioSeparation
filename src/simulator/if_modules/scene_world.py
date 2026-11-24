@@ -76,9 +76,21 @@ class SceneWorldBuilder:
         mat_cfg = self.config.materials or {}
         surface_ids: List[str] = getattr(self._room, "surface_ids", [])
 
-        # Build assignment map from config; default all surfaces to "concrete"
-        assignments = {sid: mat_cfg.get(sid, mat_cfg.get("default", "concrete"))
-                       for sid in surface_ids}
+        # Build assignment map from config; default all surfaces to "concrete".
+        # A value may be a material name or {"alpha": [6 bands], "sigma": [6 bands]}
+        # (e.g. a calibrated absorption); such specs are registered under a
+        # content-derived name.
+        import hashlib, json as _json
+        raw_assign = {sid: mat_cfg.get(sid, mat_cfg.get("default", "concrete")) for sid in surface_ids}
+        assignments = {}
+        for sid, v in raw_assign.items():
+            if isinstance(v, dict):
+                name = "custom_" + hashlib.sha256(_json.dumps(v, sort_keys=True).encode()).hexdigest()[:12]
+                if name not in self._db:
+                    self._db.register(name, alpha=v["alpha"], sigma=v.get("sigma", [0.05] * 6))
+                assignments[sid] = name
+            else:
+                assignments[sid] = v
 
         self._materials = assign_materials(surface_ids, assignments, self._db)
 

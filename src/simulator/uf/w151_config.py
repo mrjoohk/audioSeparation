@@ -43,7 +43,7 @@ ENTITY_ID_PATTERN = re.compile(r"^[A-Za-z0-9.-]+(?:_[A-Za-z0-9.-]+)*$")
 ENTITY_ID_MAX_LEN = 64
 
 # Optional top-level keys carried through SceneConfig.extras (static_v1 contract).
-EXTRA_TOP_LEVEL_KEYS = ("render", "qc", "reference_receiver")
+EXTRA_TOP_LEVEL_KEYS = ("render", "qc", "reference_receiver", "mix")
 
 _SUBSYSTEM_NAMES: List[str] = [
     "room",

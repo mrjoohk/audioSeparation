@@ -1,0 +1,41 @@
+{
+ "meetings": [
+  "ES2004a",
+  "ES2004b",
+  "ES2004c",
+  "ES2004d",
+  "ES2014a",
+  "ES2014b",
+  "ES2014c",
+  "ES2014d",
+  "IS1003a",
+  "IS1003c",
+  "IS1003d",
+  "IS1006a",
+  "IS1006b",
+  "IS1006c",
+  "IS1006d",
+  "IS1007a"
+ ],
+ "n_scenes": {
+  "ES2004a": 80,
+  "ES2004b": 80,
+  "ES2004c": 80,
+  "ES2004d": 80,
+  "ES2014a": 80,
+  "ES2014b": 80,
+  "ES2014c": 80,
+  "ES2014d": 80,
+  "IS1003a": 80,
+  "IS1003c": 80,
+  "IS1003d": 80,
+  "IS1006a": 80,
+  "IS1006b": 80,
+  "IS1006c": 80,
+  "IS1006d": 80,
+  "IS1007a": 80
+ },
+ "total": 1280,
+ "n_speakers": 20,
+ "disjoint_from": "dev, retired blind, blind2, blind3 (speakers); TNO room"
+}

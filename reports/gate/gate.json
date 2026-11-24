@@ -1,0 +1,53 @@
+{
+ "candidate": "candidate",
+ "verdict": "inconclusive",
+ "advisory": true,
+ "rules_version": 1,
+ "rules_status": "proposed",
+ "comparisons": [
+  {
+   "id": "wer_vs_fixed_baseline",
+   "metric": "wer",
+   "reference": "fixed_baseline",
+   "n_sessions": 0,
+   "verdict": "inconclusive",
+   "reason": "no common sessions"
+  },
+  {
+   "id": "wer_vs_unprocessed",
+   "metric": "wer",
+   "reference": "unprocessed",
+   "n_sessions": 0,
+   "verdict": "inconclusive",
+   "reason": "no common sessions"
+  },
+  {
+   "id": "der_vs_unprocessed",
+   "metric": "der",
+   "reference": "unprocessed",
+   "n_sessions": 24,
+   "candidate_mean": 0.9483173499607916,
+   "reference_mean": 1.1987417676361767,
+   "change": -25.042441767538502,
+   "paired_diff_ci95": [
+    -0.3671392323638107,
+    -0.1498888932204274
+   ],
+   "verdict": "pass"
+  }
+ ],
+ "regression": {
+  "metric": "wer",
+  "reference": "fixed_baseline",
+  "threshold_pp": 0.5,
+  "rule": "fail if degradation >= threshold",
+  "conditions": [],
+  "worst_degradation_pp": null,
+  "verdict": "inconclusive"
+ },
+ "systems": {
+  "candidate": "M2_aug_coral",
+  "fixed_baseline": "M0_baseline",
+  "unprocessed": "unprocessed"
+ }
+}

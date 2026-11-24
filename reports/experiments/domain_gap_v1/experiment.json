@@ -1,0 +1,210 @@
+{
+ "schema_version": "1.0.0",
+ "kind": "domain_gap",
+ "created_at": "2026-11-21T07:30:18.861281+00:00",
+ "seed": 0,
+ "config": {
+  "augment": {
+   "gain_db": [
+    -6.0,
+    6.0
+   ],
+   "channel_mismatch_db": 1.0,
+   "tilt_db": [
+    -6.0,
+    6.0
+   ],
+   "bandlimit_prob": 0.3,
+   "bandlimit_hz": [
+    3400.0,
+    7000.0
+   ],
+   "noise_prob": 0.5,
+   "noise_snr_db": [
+    10.0,
+    30.0
+   ]
+  }
+ },
+ "data": {
+  "source": {
+   "name": "gap-src",
+   "version": "1.0.0",
+   "release_manifest_sha256": "3a7bf59f8e42f23aa44e14e592b8f75220f433e409aba31ca3010cf8146c38d6"
+  },
+  "proxy_dev": {
+   "name": "gap-pdev",
+   "version": "1.0.0",
+   "release_manifest_sha256": "3957affa32148d31b570397d393fabf1e132dc395255f41a183ba51013766b69"
+  },
+  "proxy_test": {
+   "name": "gap-ptest",
+   "version": "1.0.0",
+   "release_manifest_sha256": "878559d3603ab080cba2daba0f41e403486cedf02043c0578408bf62d92e3e05"
+  },
+  "calibration_profile": {
+   "id": "calib-84d4643404",
+   "data_version": "3957affa3214",
+   "fit_sessions": [
+    "pdev_000020"
+   ],
+   "created_at": "2026-11-21T07:20:59.843059+00:00",
+   "rt60_samples": [
+    0.3777335731130916
+   ],
+   "parameter_ranges": {
+    "rt60_s": [
+     0.3777335731130916,
+     0.3777335731130916
+    ]
+   },
+   "rt60_median_s": 0.3777335731130916,
+   "method": "blind_rt60 (T20 on free decays, median)"
+  }
+ },
+ "checkpoint": {
+  "M0": {
+   "path": "mask_model.npz",
+   "sha256": "19a0ba1fa7f7470e70f89b1bc22766780560ac858902a55f41c3a0f11e673b63",
+   "n_frames": 238652
+  },
+  "M1": {
+   "path": "mask_model.npz",
+   "sha256": "a674b64c1f4dcaa5448807bdffcec4f1824a88183df885d9fb4c317bc73e8a99",
+   "n_frames": 715956
+  }
+ },
+ "metrics": {
+  "proxy_domain_note": "No real recordings: the 'real' domain is a simulated proxy (other rooms, band reverb, 4 kHz device, sensitivity mismatch, held-out arrays).",
+  "calibration": {
+   "profile_id": "calib-84d4643404",
+   "rt60_median_s": 0.3777335731130916,
+   "kl_measured_vs_regenerated": 0.24282404541191693,
+   "req302_kl_le_0_1": false
+  },
+  "req303": {
+   "unseen_gain_M1_vs_M0_db": -1.107575939756893,
+   "req303_gain_ge_1_5db": false,
+   "per_array": {
+    "circular3_r3": {
+     "M0_drop_db": 3.8205149986582465,
+     "M1_drop_db": 6.093848122336293,
+     "halved": false
+    },
+    "linear3_4cm": {
+     "M0_drop_db": 1.2650211715739603,
+     "M1_drop_db": 2.9083615000445477,
+     "halved": false
+    },
+    "square4_8cm": {
+     "M0_drop_db": 2.5473995320722063,
+     "M1_drop_db": 2.8910975088731177,
+     "halved": false
+    }
+   }
+  },
+  "req304": {
+   "domain_bce_before": 0.692101795504978,
+   "domain_bce_after": 0.6859145368607454,
+   "note": "diagnostic only (design \u00a76.3)"
+  },
+  "adoption": {
+   "dev_ci_lower_vs_M0": {
+    "M1_augmented": -1.6953950512507958,
+    "M2_aug_coral": -1.9613354225698643
+   },
+   "adopted": "M0_baseline"
+  },
+  "means": {
+   "in_domain": {
+    "unprocessed": {
+     "si_sdri_db": 0.0,
+     "der": 1.8073662422651708
+    },
+    "M0_baseline": {
+     "si_sdri_db": 0.5225382166972782,
+     "der": 1.5433641255073143,
+     "doa_err_deg": 36.42857615062026
+    },
+    "M1_augmented": {
+     "si_sdri_db": 0.35102493481866875,
+     "der": 1.4961327355021974,
+     "doa_err_deg": 36.42857615062026
+    },
+    "M2_aug_coral": {
+     "si_sdri_db": 0.24861818557710288,
+     "der": 1.4773064664328015,
+     "doa_err_deg": 36.42857615062026
+    },
+    "M3_coral_only": {
+     "si_sdri_db": 0.3995894275094292,
+     "der": 1.5372065170387355,
+     "doa_err_deg": 36.42857615062026
+    }
+   },
+   "proxy_dev": {
+    "unprocessed": {
+     "si_sdri_db": 0.0,
+     "der": 1.7962611156456234
+    },
+    "M0_baseline": {
+     "si_sdri_db": 0.18019967226709924,
+     "der": 1.5842227283996435,
+     "doa_err_deg": 21.188478758251517
+    },
+    "M1_augmented": {
+     "si_sdri_db": -0.9177369164926347,
+     "der": 1.543339500032507,
+     "doa_err_deg": 21.188478758251517
+    },
+    "M2_aug_coral": {
+     "si_sdri_db": -1.066380382163811,
+     "der": 1.5385528924895169,
+     "doa_err_deg": 21.188478758251517
+    },
+    "M3_coral_only": {
+     "si_sdri_db": -0.4040233778359731,
+     "der": 1.5720809424022257,
+     "doa_err_deg": 21.188478758251517
+    }
+   },
+   "proxy_test": {
+    "unprocessed": {
+     "si_sdri_db": 0.0,
+     "der": 1.1987417676361767
+    },
+    "M0_baseline": {
+     "si_sdri_db": -1.9698850680354667,
+     "der": 0.9649139565219649,
+     "doa_err_deg": 38.36876183600133
+    },
+    "M1_augmented": {
+     "si_sdri_db": -3.0774610077923596,
+     "der": 0.9525097278796905,
+     "doa_err_deg": 38.36876183600133
+    },
+    "M2_aug_coral": {
+     "si_sdri_db": -3.511663207481067,
+     "der": 0.9483173499607916,
+     "doa_err_deg": 38.36876183600133
+    },
+    "M3_coral_only": {
+     "si_sdri_db": -2.4494063588215798,
+     "der": 0.949409403107349,
+     "doa_err_deg": 38.36876183600133
+    }
+   }
+  }
+ },
+ "evaluator": null,
+ "code": {
+  "commit": "fd867f9ef6ccf2639679aba72d13ccdcef20f78c",
+  "dirty": true
+ },
+ "environment": {
+  "python": "3.14.8",
+  "numpy": "2.5.5",
+  "scipy": "1.18.1",
+  "platform": "Windows-11-10.0.26300-SP0"
+ }
+}

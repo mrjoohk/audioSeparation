@@ -1,0 +1,64 @@
+{
+ "schema_version": "1.0.0",
+ "kind": "req401_benchmark",
+ "created_at": "2026-11-21T08:29:16.081156+00:00",
+ "seed": 0,
+ "config": {
+  "systems": [
+   "unprocessed",
+   "candidate_net"
+  ]
+ },
+ "data": {
+  "name": "req401-bench",
+  "version": "1.0.0",
+  "release_manifest_sha256": "cafa6972500e394bb3360c3b9cdd324713e73bcada5a7c4a560e3dca8debd8fc",
+  "split": "test"
+ },
+ "checkpoint": {
+  "path": "masknet.pt",
+  "sha256": "9ced3aae8023e0c26f958ae8bfa953d4cdf4b2ded355342a4438a0e61db7fb58"
+ },
+ "metrics": {
+  "benchmark": {
+   "spec": "reports\\experiments\\req401_neural\\benchmark_spec.yaml",
+   "n_scenes": 360,
+   "audio_hours": 1.0,
+   "data_sha256": "842342d62703f81d00d46dfdf7b7ab1ff85bafe396b3d6a9d1e1cdfe146730f8"
+  },
+  "si_sdri_db_mean": 8.284277866326809,
+  "der_mean": 0.4742849108153807,
+  "paired_vs_unprocessed": {
+   "n": 360,
+   "mean_diff": 8.284277866326809,
+   "ci95": [
+    7.773437558654014,
+    8.77275814257143
+   ]
+  },
+  "evaluation_wall_s": 92.93766188621521,
+  "evaluation_rtf": 0.025816017190615336,
+  "req401_si_sdri_ge_8db": true,
+  "req401_eval_within_1h": true,
+  "train_checkpoint": {
+   "path": "masknet.pt",
+   "sha256": "9ced3aae8023e0c26f958ae8bfa953d4cdf4b2ded355342a4438a0e61db7fb58"
+  },
+  "train_time_s": 1979.7175543308258,
+  "note": "synthetic speech-like stand-in assets; not real speech"
+ },
+ "evaluator": {
+  "module": "evaluation.compare",
+  "pit": true
+ },
+ "code": {
+  "commit": "fd867f9ef6ccf2639679aba72d13ccdcef20f78c",
+  "dirty": true
+ },
+ "environment": {
+  "python": "3.14.8",
+  "numpy": "2.5.5",
+  "scipy": "1.18.1",
+  "platform": "Windows-11-10.0.26300-SP0"
+ }
+}

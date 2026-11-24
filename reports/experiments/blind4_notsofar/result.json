@@ -1,0 +1,286 @@
+{
+ "candidate": "v3-mix",
+ "baseline": "v2-base",
+ "frozen_sha256": "39e9a93eebd5b04b5a4bfc969c8e894dee5a9870200a84a696a8afcc48685cf3",
+ "n_sessions": 24,
+ "sessions": [
+  "MTG_32000",
+  "MTG_32003",
+  "MTG_32004",
+  "MTG_32005",
+  "MTG_32007",
+  "MTG_32008",
+  "MTG_32009",
+  "MTG_32020",
+  "MTG_32021",
+  "MTG_32023",
+  "MTG_32024",
+  "MTG_32026",
+  "MTG_32040",
+  "MTG_32045",
+  "MTG_32046",
+  "MTG_32047",
+  "MTG_32053",
+  "MTG_32060",
+  "MTG_32061",
+  "MTG_32062",
+  "MTG_32064",
+  "MTG_32072",
+  "MTG_32073",
+  "MTG_32080"
+ ],
+ "n_scenes": 652,
+ "means": {
+  "unprocessed": {
+   "si_sdri_db": 0.0,
+   "der": 0.9224122238903494,
+   "wer": 0.43289894723559397,
+   "wer_gated": 0.43289894723559397,
+   "cpwer": 0.8206179118436981,
+   "cpwer_gated": 0.8206179118436981
+  },
+  "v3-mix": {
+   "si_sdri_db": 0.3698634036955004,
+   "der": 0.5925247201914476,
+   "wer": 0.8470832604442663,
+   "wer_gated": 0.7527552323228905,
+   "cpwer": 0.9156841320522121,
+   "cpwer_gated": 0.8290909844800847
+  },
+  "v2-base": {
+   "si_sdri_db": -0.5030684022227243,
+   "der": 0.69558294352273,
+   "wer": 0.846981849187396,
+   "wer_gated": 0.7737055637904313,
+   "cpwer": 0.9292000914461152,
+   "cpwer_gated": 0.8686797669545662
+  },
+  "v3-real": {
+   "si_sdri_db": 1.7182297282718741,
+   "der": 0.46300250481031485,
+   "wer": 0.6866227430231985,
+   "wer_gated": 0.5945244860023379,
+   "cpwer": 0.7276856466678056,
+   "cpwer_gated": 0.6734518038378086
+  },
+  "v1-base": {
+   "si_sdri_db": 0.0817840188718766,
+   "der": 0.6620438034465569,
+   "wer": 0.858169833237684,
+   "wer_gated": 0.7655173926679919,
+   "cpwer": 0.8771336353781276,
+   "cpwer_gated": 0.8169336215240527
+  }
+ },
+ "gate": {
+  "candidate": "candidate",
+  "verdict": "fail",
+  "advisory": false,
+  "rules_version": 1,
+  "rules_status": "approved",
+  "comparisons": [
+   {
+    "id": "wer_vs_fixed_baseline",
+    "metric": "cpwer",
+    "reference": "fixed_baseline",
+    "n_sessions": 24,
+    "candidate_mean": 0.9079861082795274,
+    "reference_mean": 0.9594887244347734,
+    "change": -5.150261615524599,
+    "paired_diff_ci95": [
+     -0.12072599867214795,
+     0.019219970327274596
+    ],
+    "verdict": "inconclusive",
+    "reason": "improvement not significant (CI upper >= 0)"
+   },
+   {
+    "id": "wer_vs_unprocessed",
+    "metric": "cpwer",
+    "reference": "unprocessed",
+    "n_sessions": 24,
+    "candidate_mean": 0.9079861082795274,
+    "reference_mean": 0.82266756562273,
+    "change": 0.10370962247942071,
+    "paired_diff_ci95": [
+     0.004807610501092356,
+     0.1677791858690911
+    ],
+    "verdict": "fail"
+   },
+   {
+    "id": "der_vs_unprocessed",
+    "metric": "der",
+    "reference": "unprocessed",
+    "n_sessions": 24,
+    "candidate_mean": 0.5928905011405176,
+    "reference_mean": 0.9202229160679279,
+    "change": -32.73324149274104,
+    "paired_diff_ci95": [
+     -0.3561371620810301,
+     -0.3004645885525407
+    ],
+    "verdict": "pass"
+   }
+  ],
+  "regression": {
+   "metric": "wer",
+   "reference": "fixed_baseline",
+   "threshold_pp": 0.5,
+   "rule": "fail if degradation >= threshold",
+   "conditions": [
+    {
+     "condition": "all",
+     "n_sessions": 24,
+     "degradation_pp": -3.552437889097149,
+     "fails": false
+    }
+   ],
+   "worst_degradation_pp": -3.552437889097149,
+   "verdict": "pass"
+  }
+ },
+ "reference_pairs": {
+  "unprocessed": {
+   "si_sdri_db": {
+    "n_sessions": 24,
+    "mean_diff": 0.6892378044095989,
+    "ci95": [
+     0.12799931627961053,
+     1.196597137505872
+    ]
+   },
+   "cpwer": {
+    "n_sessions": 24,
+    "mean_diff": -0.13682115881204343,
+    "ci95": [
+     -0.21350266650349542,
+     -0.06732879183290934
+    ]
+   }
+  },
+  "v3-real": {
+   "si_sdri_db": {
+    "n_sessions": 24,
+    "mean_diff": 2.3039481753649316,
+    "ci95": [
+     1.4867157824050132,
+     3.1151463170647413
+    ]
+   },
+   "cpwer": {
+    "n_sessions": 24,
+    "mean_diff": -0.2266980357403431,
+    "ci95": [
+     -0.2806399041843629,
+     -0.17488114753493125
+    ]
+   }
+  },
+  "v1-base": {
+   "si_sdri_db": {
+    "n_sessions": 24,
+    "mean_diff": 0.6258047466382076,
+    "ci95": [
+     0.15999602072449695,
+     1.0572953769724658
+    ]
+   },
+   "cpwer": {
+    "n_sessions": 24,
+    "mean_diff": -0.07939359592295571,
+    "ci95": [
+     -0.15761706608142573,
+     -0.010167964384039671
+    ]
+   }
+  }
+ },
+ "verdict": {
+  "REQ-303": {
+   "rule": "cand - base SI-SDRi >= +1.5 dB",
+   "n_sessions": 24,
+   "mean_diff": 0.9332744306859571,
+   "ci95": [
+    0.4894869581113518,
+    1.4036325075612557
+   ],
+   "verdict": "fail"
+  },
+  "REQ-305": {
+   "rule": "decision_rules wer_vs_fixed_baseline (cpWER)",
+   "id": "wer_vs_fixed_baseline",
+   "metric": "cpwer",
+   "reference": "fixed_baseline",
+   "n_sessions": 24,
+   "candidate_mean": 0.9079861082795274,
+   "reference_mean": 0.9594887244347734,
+   "change": -5.150261615524599,
+   "paired_diff_ci95": [
+    -0.12072599867214795,
+    0.019219970327274596
+   ],
+   "verdict": "inconclusive",
+   "reason": "improvement not significant (CI upper >= 0)"
+  },
+  "REQ-402": {
+   "rule": "decision_rules wer_vs_unprocessed (cpWER) and der_vs_unprocessed",
+   "cpwer": {
+    "id": "wer_vs_unprocessed",
+    "metric": "cpwer",
+    "reference": "unprocessed",
+    "n_sessions": 24,
+    "candidate_mean": 0.9079861082795274,
+    "reference_mean": 0.82266756562273,
+    "change": 0.10370962247942071,
+    "paired_diff_ci95": [
+     0.004807610501092356,
+     0.1677791858690911
+    ],
+    "verdict": "fail"
+   },
+   "der": {
+    "id": "der_vs_unprocessed",
+    "metric": "der",
+    "reference": "unprocessed",
+    "n_sessions": 24,
+    "candidate_mean": 0.5928905011405176,
+    "reference_mean": 0.9202229160679279,
+    "change": -32.73324149274104,
+    "paired_diff_ci95": [
+     -0.3561371620810301,
+     -0.3004645885525407
+    ],
+    "verdict": "pass"
+   },
+   "verdict": "fail"
+  },
+  "REQ-405": {
+   "regression": {
+    "metric": "wer",
+    "reference": "fixed_baseline",
+    "threshold_pp": 0.5,
+    "rule": "fail if degradation >= threshold",
+    "conditions": [
+     {
+      "condition": "all",
+      "n_sessions": 24,
+      "degradation_pp": -3.552437889097149,
+      "fails": false
+     }
+    ],
+    "worst_degradation_pp": -3.552437889097149,
+    "verdict": "pass"
+   },
+   "verdict": "pass"
+  }
+ },
+ "rules_status": "approved",
+ "rules_amendments": [
+  {
+   "at": "2026-11-24",
+   "by": "product owner (chat approval)",
+   "change": "REQ-305/402 WER metric wer -> cpwer (design 17)"
+  }
+ ]
+}

@@ -69,8 +69,11 @@ def compute_image_sources(
     mic_pos: np.ndarray,
     ism_order: int,
     material_map_or_alpha_per_wall=None,
+    band_index: int = 2,
 ) -> List[ImageSource]:
     """Enumerate image sources for a shoebox room using Allen-Berkley ISM.
+
+    ``band_index`` selects the octave band of a MaterialMap (default 2 = 500 Hz).
 
     Wall/surface ordering (matches MaterialMap keys used elsewhere):
         0 – floor     (y = 0)
@@ -123,7 +126,7 @@ def compute_image_sources(
     # --- Build per-wall reflection coefficients ---
     # Wall order: [floor, ceiling, wall_x+, wall_x-, wall_z+, wall_z-]
     wall_ids = ["floor", "ceiling", "wall_x+", "wall_x-", "wall_z+", "wall_z-"]
-    band_idx_500 = 2  # index into OCTAVE_BAND_CENTERS for 500 Hz
+    band_idx_500 = int(band_index)  # octave band used for MaterialMap absorption
 
     if material_map_or_alpha_per_wall is None:
         alphas = np.full(6, _DEFAULT_ALPHA, dtype=np.float64)
@@ -154,84 +157,49 @@ def compute_image_sources(
     # wall_refl: [floor, ceiling, wall_x+, wall_x-, wall_z+, wall_z-]
 
     max_dist = MAX_RIR_DURATION_S * SPEED_OF_SOUND
-    image_sources: List[ImageSource] = []
 
-    for nx in range(-ism_order, ism_order + 1):
-        ix = _reflect_coord(nx, src_pos[0], L)
-        for ny in range(-ism_order, ism_order + 1):
-            iy = _reflect_coord(ny, src_pos[1], H)
-            for nz in range(-ism_order, ism_order + 1):
-                if nx == 0 and ny == 0 and nz == 0:
-                    continue
+    # Vectorised enumeration (same order as nested nx, ny, nz loops).
+    rng_n = np.arange(-ism_order, ism_order + 1)
+    nx, ny, nz = (g.ravel() for g in np.meshgrid(rng_n, rng_n, rng_n, indexing="ij"))
+    order = np.abs(nx) + np.abs(ny) + np.abs(nz)
+    keep = (order > 0) & (order <= ism_order)
+    nx, ny, nz, order = nx[keep], ny[keep], nz[keep], order[keep]
 
-                if abs(nx) + abs(ny) + abs(nz) > ism_order:
-                    continue
+    def _coord(n, src, size):
+        # Allen-Berkley for a room spanning [0, size]: even n → n*size + src,
+        # odd n → (n + 1)*size - src  (see _reflect_coord)
+        return np.where(n % 2 == 0, n * size + src, (n + 1) * size - src)
 
-                iz = _reflect_coord(nz, src_pos[2], W)
+    pos = np.stack([
+        _coord(nx, src_pos[0], L),
+        _coord(ny, src_pos[1], H),
+        _coord(nz, src_pos[2], W),
+    ], axis=1)
+    dist = np.linalg.norm(pos - mic_pos, axis=1)
+    ok = (dist <= max_dist) & (dist >= 1e-9)
 
-                img_pos = np.array([ix, iy, iz], dtype=np.float64)
-                dist = float(np.linalg.norm(img_pos - mic_pos))
+    def _hits(n):
+        """(minus_wall_hits, plus_wall_hits) for reflection index n."""
+        a = np.abs(n)
+        plus = np.where(n >= 0, (a + 1) // 2, a // 2)
+        minus = np.where(n >= 0, a // 2, (a + 1) // 2)
+        return minus, plus
 
-                if dist > max_dist or dist < 1e-9:
-                    continue
+    # wall order: [floor, ceiling, wall_x+, wall_x-, wall_z+, wall_z-]
+    floor_h, ceil_h = _hits(ny)
+    xm_h, xp_h = _hits(nx)
+    zm_h, zp_h = _hits(nz)
+    gain = (
+        refl_coeff[0] ** floor_h * refl_coeff[1] ** ceil_h
+        * refl_coeff[2] ** xp_h * refl_coeff[3] ** xm_h
+        * refl_coeff[4] ** zp_h * refl_coeff[5] ** zm_h
+    )
+    path_gain = np.where(ok, gain / np.where(ok, dist, 1.0), 0.0)
 
-                # --- Accumulate reflection coefficient product ---
-                # For each axis index n:
-                #   floor / ceiling reflections along y:
-                #       floor hits   = number of downward crossings
-                #       ceiling hits = number of upward crossings
-                #   x-walls:
-                #       wall_x- hits, wall_x+ hits
-                #   z-walls:
-                #       wall_z- hits, wall_z+ hits
-                #
-                # Allen-Berkley: for reflection index n along one dimension,
-                # the number of reflections off each wall depends on parity of n.
-                #   |n| reflections total along that axis;
-                #   ceiling(|n|/2) from one wall, floor(|n|/2) from the other.
-                #   If n > 0: more reflections off the + wall; if n < 0: more off - wall.
-
-                def _wall_hits(n: int):
-                    """Return (hits_minus_wall, hits_plus_wall) for index n."""
-                    abs_n = abs(n)
-                    if n >= 0:
-                        plus_hits = (abs_n + 1) // 2
-                        minus_hits = abs_n // 2
-                    else:
-                        minus_hits = (abs_n + 1) // 2
-                        plus_hits = abs_n // 2
-                    return minus_hits, plus_hits
-
-                # Y axis: floor = -, ceiling = +
-                floor_hits, ceil_hits = _wall_hits(ny)
-                # X axis: wall_x- = -, wall_x+ = +
-                xminus_hits, xplus_hits = _wall_hits(nx)
-                # Z axis: wall_z- = -, wall_z+ = +
-                zminus_hits, zplus_hits = _wall_hits(nz)
-
-                # wall order: [floor, ceiling, wall_x+, wall_x-, wall_z+, wall_z-]
-                gain = (
-                    refl_coeff[0] ** floor_hits
-                    * refl_coeff[1] ** ceil_hits
-                    * refl_coeff[2] ** xplus_hits
-                    * refl_coeff[3] ** xminus_hits
-                    * refl_coeff[4] ** zplus_hits
-                    * refl_coeff[5] ** zminus_hits
-                )
-
-                # 1/r attenuation
-                path_gain = gain / dist
-
-                order = abs(nx) + abs(ny) + abs(nz)
-                image_sources.append(
-                    ImageSource(
-                        position=img_pos,
-                        reflection_order=order,
-                        path_gain=float(path_gain),
-                    )
-                )
-
-    return image_sources
+    return [
+        ImageSource(position=pos[i].copy(), reflection_order=int(order[i]), path_gain=float(path_gain[i]))
+        for i in np.flatnonzero(ok)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -280,15 +248,13 @@ def generate_late_reverb_tail(
         return output
 
     rng = np.random.default_rng(seed)
-    noise = rng.standard_normal(tail_len).astype(np.float64)
+    noise = rng.standard_normal(tail_len, dtype=np.float32)
 
-    t = np.arange(tail_len, dtype=np.float64) / fs
     # Energy decays as exp(-6.9 * t / RT60) → amplitude as exp(-3.45 * t / RT60)
     # i.e.  e^(-6.9 t/T60) in energy  ≡  e^(-ln(10^6) * t / T60) = 10^(-6t/T60)
-    decay = np.exp(-6.9 * t / rt60_s)
-    envelope = noise * decay
-
-    output[onset_sample:] = envelope.astype(np.float32)
+    # float32 is ample for a stochastic tail and halves the cost (REQ-W04 throughput).
+    decay = np.exp(np.arange(tail_len, dtype=np.float32) * np.float32(-6.9 / (rt60_s * fs)))
+    output[onset_sample:] = noise * decay
     return output
 
 
@@ -491,8 +457,9 @@ def fit_rt60(
 def estimate_sabine_rt60(
     room_dims: Dict[str, float],
     material_map: MaterialMap,
+    band_index: int = 2,
 ) -> float:
-    """Estimate RT60 using the Sabine formula at 500 Hz.
+    """Estimate RT60 using the Sabine formula at 500 Hz (or octave band ``band_index``).
 
     RT60 = 0.161 * V / (sum_i alpha_i * S_i)
 
@@ -523,7 +490,7 @@ def estimate_sabine_rt60(
     H = float(room_dims["H"])
     V = L * W * H
 
-    band_idx = 2  # 500 Hz
+    band_idx = int(band_index)  # default 2 = 500 Hz
 
     # surface_id → area_m2
     surface_areas: dict[str, float] = {

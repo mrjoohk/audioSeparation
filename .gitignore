@@ -19,3 +19,6 @@ output/
 output_test/
 *.wav
 !tests/**/*.wav
+
+# third-party datasets (downloaded, not versioned)
+data/external/

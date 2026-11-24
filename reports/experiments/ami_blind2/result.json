@@ -1,0 +1,98 @@
+{
+ "candidate": "v1-cal",
+ "candidate_dev_si_sdri_db": 1.811662941112558,
+ "baseline": "v1-base",
+ "frozen_sha256": "b4cf6161ee0fe244ec916801de57e4db7f36ad66fe19f4d80bb2996beb9be535",
+ "n_sessions": 20,
+ "sessions": [
+  "ami-TS3004a",
+  "ami-TS3004b",
+  "ami-TS3004c",
+  "ami-TS3004d",
+  "ami-TS3005a",
+  "ami-TS3005b",
+  "ami-TS3005c",
+  "ami-TS3005d",
+  "ami-TS3006a",
+  "ami-TS3006b",
+  "ami-TS3006c",
+  "ami-TS3006d",
+  "ami-TS3007a",
+  "ami-TS3007b",
+  "ami-TS3007c",
+  "ami-TS3007d",
+  "ami-TS3008a",
+  "ami-TS3008b",
+  "ami-TS3008c",
+  "ami-TS3008d"
+ ],
+ "n_scenes": 800,
+ "means": {
+  "unprocessed": {
+   "si_sdri_db": 0.0,
+   "der": 0.7707611523921796,
+   "wer": 0.5044079551812207,
+   "wer_gated": 0.5044079551812207
+  },
+  "v1-cal": {
+   "si_sdri_db": -0.10751673626086167,
+   "der": 0.5091017904694833,
+   "wer": 0.8695517295205996,
+   "wer_gated": 0.7563004030068867
+  },
+  "v1-base": {
+   "si_sdri_db": 0.26434435325474115,
+   "der": 0.5435388506705371,
+   "wer": 0.8803654000814259,
+   "wer_gated": 0.7453254555131401
+  },
+  "v2-cal": {
+   "si_sdri_db": 0.11785678660394153,
+   "der": 0.5124417570582119,
+   "wer": 0.8834826660636462,
+   "wer_gated": 0.7974844105911743
+  },
+  "v2-base": {
+   "si_sdri_db": -0.22556751236181008,
+   "der": 0.5568937263572975,
+   "wer": 0.8726997467382523,
+   "wer_gated": 0.7783033104615962
+  }
+ },
+ "verdict": {
+  "REQ-303": {
+   "rule": "cand - base SI-SDRi >= +1.5 dB",
+   "n_sessions": 20,
+   "mean_diff": -0.37186108951560287,
+   "ci95": [
+    -0.6735133307342112,
+    -0.046160417687428096
+   ],
+   "met": false
+  },
+  "REQ-305": {
+   "rule": "cand - base WER <= -3.0 pp, session CI upper < 0, >= 20 sessions",
+   "mean_diff_pp": -1.0813670560826474,
+   "ci95_pp": [
+    -3.5081812087606865,
+    1.5861365374560146
+   ],
+   "n_sessions": 20,
+   "met": false,
+   "withheld": false,
+   "gated_secondary_pp": {
+    "mean": 1.0974947493746698,
+    "ci95": [
+     -1.0955893083767556,
+     3.091742663001154
+    ]
+   }
+  },
+  "REQ-402": {
+   "rule": "WER relative <= -15 % and DER <= -5.0 pp vs unprocessed",
+   "wer_rel": 0.7239056612582411,
+   "der_pp": -26.165936192269623,
+   "met": false
+  }
+ }
+}

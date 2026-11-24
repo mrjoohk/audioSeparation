@@ -1,0 +1,260 @@
+{
+ "candidate": "v4-real",
+ "baseline": "v2-base",
+ "frozen_sha256": "5554f37d609e275a06cbe428fd5653ebd59d30a8acf3e019049a4dca3be58402",
+ "n_sessions": 26,
+ "sessions": [
+  "MTG_32100",
+  "MTG_32105",
+  "MTG_32109",
+  "MTG_32175",
+  "MTG_32178",
+  "MTG_32181",
+  "MTG_32185",
+  "MTG_32190",
+  "MTG_32250",
+  "MTG_32254",
+  "MTG_32255",
+  "MTG_32256",
+  "MTG_32264",
+  "MTG_32265",
+  "MTG_32266",
+  "MTG_32310",
+  "MTG_32311",
+  "MTG_32312",
+  "MTG_32313",
+  "MTG_32316",
+  "MTG_32317",
+  "MTG_32319",
+  "MTG_32320",
+  "MTG_32321",
+  "MTG_32323",
+  "MTG_32325"
+ ],
+ "n_scenes": 846,
+ "means": {
+  "unprocessed": {
+   "si_sdri_db": 0.0,
+   "der": 0.8934666639209345,
+   "wer": 0.40993584668765537,
+   "wer_gated": 0.40993584668765537,
+   "cpwer": 0.8416449457140501,
+   "cpwer_gated": 0.8416449457140501
+  },
+  "v4-real": {
+   "si_sdri_db": 4.150534524151149,
+   "der": 0.36489474055740556,
+   "wer": 0.6672576099212038,
+   "wer_gated": 0.574285641941103,
+   "cpwer": 0.659454998746044,
+   "cpwer_gated": 0.5970659524364523
+  },
+  "v2-base": {
+   "si_sdri_db": 0.10787850504111907,
+   "der": 0.6201345532786616,
+   "wer": 0.8189435656411329,
+   "wer_gated": 0.7299527495964255,
+   "cpwer": 0.867275059222079,
+   "cpwer_gated": 0.799405997623205
+  },
+  "v3-mix": {
+   "si_sdri_db": 1.7888894751019873,
+   "der": 0.5233572390473091,
+   "wer": 0.7997934430940277,
+   "wer_gated": 0.676266870551977,
+   "cpwer": 0.8210052290066111,
+   "cpwer_gated": 0.7157943316330672
+  }
+ },
+ "gate": {
+  "candidate": "candidate",
+  "verdict": "pass",
+  "advisory": false,
+  "rules_version": 1,
+  "rules_status": "approved",
+  "comparisons": [
+   {
+    "id": "wer_vs_fixed_baseline",
+    "metric": "cpwer",
+    "reference": "fixed_baseline",
+    "n_sessions": 26,
+    "candidate_mean": 0.6421995175179368,
+    "reference_mean": 0.8662327128781642,
+    "change": -22.403319536022735,
+    "paired_diff_ci95": [
+     -0.2605677379319559,
+     -0.18719720231727682
+    ],
+    "verdict": "pass"
+   },
+   {
+    "id": "wer_vs_unprocessed",
+    "metric": "cpwer",
+    "reference": "unprocessed",
+    "n_sessions": 26,
+    "candidate_mean": 0.6421995175179368,
+    "reference_mean": 0.8368594310935182,
+    "change": -0.23260765947420908,
+    "paired_diff_ci95": [
+     -0.2435030600989567,
+     -0.14652772618515006
+    ],
+    "verdict": "pass"
+   },
+   {
+    "id": "der_vs_unprocessed",
+    "metric": "der",
+    "reference": "unprocessed",
+    "n_sessions": 26,
+    "candidate_mean": 0.35518012612953037,
+    "reference_mean": 0.8899122433547222,
+    "change": -53.473211722519174,
+    "paired_diff_ci95": [
+     -0.561481225975278,
+     -0.5083809521245406
+    ],
+    "verdict": "pass"
+   }
+  ],
+  "regression": {
+   "metric": "wer",
+   "reference": "fixed_baseline",
+   "threshold_pp": 0.5,
+   "rule": "fail if degradation >= threshold",
+   "conditions": [
+    {
+     "condition": "all",
+     "n_sessions": 26,
+     "degradation_pp": -16.508898891437443,
+     "fails": false
+    }
+   ],
+   "worst_degradation_pp": -16.508898891437443,
+   "verdict": "pass"
+  }
+ },
+ "reference_pairs": {
+  "unprocessed": {
+   "si_sdri_db": {
+    "n_sessions": 26,
+    "mean_diff": -0.14615310545845825,
+    "ci95": [
+     -0.5959827347100635,
+     0.2725675732720301
+    ]
+   },
+   "cpwer": {
+    "n_sessions": 26,
+    "mean_diff": -0.02937328178464588,
+    "ci95": [
+     -0.0670255559649913,
+     0.007312404061747768
+    ]
+   }
+  },
+  "v3-mix": {
+   "si_sdri_db": {
+    "n_sessions": 26,
+    "mean_diff": 1.6267626781007143,
+    "ci95": [
+     1.0903780097716314,
+     2.1788657253852834
+    ]
+   },
+   "cpwer": {
+    "n_sessions": 26,
+    "mean_diff": -0.044851191843448955,
+    "ci95": [
+     -0.07610460692818562,
+     -0.011692844050847305
+    ]
+   }
+  }
+ },
+ "verdict": {
+  "REQ-303": {
+   "rule": "cand - base SI-SDRi >= +1.5 dB",
+   "n_sessions": 26,
+   "mean_diff": 4.329395704790591,
+   "ci95": [
+    3.5920840814273935,
+    5.091295193084839
+   ],
+   "verdict": "pass"
+  },
+  "REQ-305": {
+   "rule": "decision_rules wer_vs_fixed_baseline (cpWER)",
+   "id": "wer_vs_fixed_baseline",
+   "metric": "cpwer",
+   "reference": "fixed_baseline",
+   "n_sessions": 26,
+   "candidate_mean": 0.6421995175179368,
+   "reference_mean": 0.8662327128781642,
+   "change": -22.403319536022735,
+   "paired_diff_ci95": [
+    -0.2605677379319559,
+    -0.18719720231727682
+   ],
+   "verdict": "pass"
+  },
+  "REQ-402": {
+   "rule": "decision_rules wer_vs_unprocessed (cpWER) and der_vs_unprocessed",
+   "cpwer": {
+    "id": "wer_vs_unprocessed",
+    "metric": "cpwer",
+    "reference": "unprocessed",
+    "n_sessions": 26,
+    "candidate_mean": 0.6421995175179368,
+    "reference_mean": 0.8368594310935182,
+    "change": -0.23260765947420908,
+    "paired_diff_ci95": [
+     -0.2435030600989567,
+     -0.14652772618515006
+    ],
+    "verdict": "pass"
+   },
+   "der": {
+    "id": "der_vs_unprocessed",
+    "metric": "der",
+    "reference": "unprocessed",
+    "n_sessions": 26,
+    "candidate_mean": 0.35518012612953037,
+    "reference_mean": 0.8899122433547222,
+    "change": -53.473211722519174,
+    "paired_diff_ci95": [
+     -0.561481225975278,
+     -0.5083809521245406
+    ],
+    "verdict": "pass"
+   },
+   "verdict": "pass"
+  },
+  "REQ-405": {
+   "regression": {
+    "metric": "wer",
+    "reference": "fixed_baseline",
+    "threshold_pp": 0.5,
+    "rule": "fail if degradation >= threshold",
+    "conditions": [
+     {
+      "condition": "all",
+      "n_sessions": 26,
+      "degradation_pp": -16.508898891437443,
+      "fails": false
+     }
+    ],
+    "worst_degradation_pp": -16.508898891437443,
+    "verdict": "pass"
+   },
+   "verdict": "pass"
+  }
+ },
+ "rules_status": "approved",
+ "rules_amendments": [
+  {
+   "at": "2026-11-24",
+   "by": "product owner (chat approval)",
+   "change": "REQ-305/402 WER metric wer -> cpwer (design 17)"
+  }
+ ]
+}

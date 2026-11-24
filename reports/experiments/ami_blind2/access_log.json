@@ -1,0 +1,38 @@
+[
+ {
+  "frozen_sha256": "b4cf6161ee0fe244ec916801de57e4db7f36ad66fe19f4d80bb2996beb9be535",
+  "candidate": "v1-cal",
+  "sessions": [
+   "ami-TS3007a",
+   "ami-TS3007b",
+   "ami-TS3007c",
+   "ami-TS3007d"
+  ]
+ },
+ {
+  "frozen_sha256": "b4cf6161ee0fe244ec916801de57e4db7f36ad66fe19f4d80bb2996beb9be535",
+  "candidate": "v1-cal",
+  "sessions": [
+   "ami-TS3004a",
+   "ami-TS3004b",
+   "ami-TS3004c",
+   "ami-TS3004d",
+   "ami-TS3005a",
+   "ami-TS3005b",
+   "ami-TS3005c",
+   "ami-TS3005d",
+   "ami-TS3006a",
+   "ami-TS3006b",
+   "ami-TS3006c",
+   "ami-TS3006d",
+   "ami-TS3007a",
+   "ami-TS3007b",
+   "ami-TS3007c",
+   "ami-TS3007d",
+   "ami-TS3008a",
+   "ami-TS3008b",
+   "ami-TS3008c",
+   "ami-TS3008d"
+  ]
+ }
+]

@@ -1,0 +1,45 @@
+# Release / candidate decision rules (design_md/W100000/W1_audit_remediation_design.md §6.2, audit F-06).
+# STATUS: approved by the product owner in the development chat on 2026-11-23; these thresholds now gate releases.
+# 2026-11-24 amendment (product owner, chat approval): the REQ-305/REQ-402 WER is cpWER (concatenated
+# minimum-permutation WER, design 17); thresholds, min_sessions and CI rules unchanged. Not applied
+# retroactively to blind2/blind3. The REQ-405 regression rule keeps plain WER (outside the amendment).
+version: 1
+status: approved            # proposed | approved
+approved_by: product owner (project user, chat approval)
+approved_at: 2026-11-23
+amendments:
+  - {at: 2026-11-24, by: product owner (chat approval), change: "REQ-305/402 WER metric wer -> cpwer (design 17)"}
+
+comparisons:                # every rule is evaluated on the same sessions
+  - id: wer_vs_fixed_baseline
+    metric: cpwer             # 2026-11-24 amendment (was wer)
+    reference: fixed_baseline
+    kind: absolute_pp       # candidate - reference, percentage points
+    max_change: -3.0        # pass if change <= -3.0 pp (REQ-305); equality passes
+    zero_reference: candidate_must_be_zero
+  - id: wer_vs_unprocessed
+    metric: cpwer             # 2026-11-24 amendment (was wer)
+    reference: unprocessed
+    kind: relative          # (candidate - reference) / reference
+    max_change: -0.15       # REQ-402: >= 15 % relative reduction
+    zero_reference: absolute_pp_max_0.5
+  - id: der_vs_unprocessed
+    metric: der
+    reference: unprocessed
+    kind: absolute_pp
+    max_change: -5.0        # REQ-402: >= 5 pp absolute reduction
+    zero_reference: candidate_must_be_zero
+
+regression:                 # REQ-405, "less than 1 %" fixed as percentage points
+  metric: wer
+  reference: fixed_baseline
+  max_condition_degradation_pp: 0.5   # a condition worse by >= 0.5 pp fails (REQ-405 AC: 0.5 % worse → Fail)
+
+uncertainty:
+  method: paired_bootstrap
+  n_resamples: 2000
+  confidence: 0.95
+  min_sessions: 20          # fewer sessions -> verdict "inconclusive"
+  require_ci_upper_below_zero: true
+
+diagnostic_only: [sdr, si_sdr, bce_discriminator, rt60_distribution_distance]

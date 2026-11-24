@@ -1,0 +1,56 @@
+{
+ "meetings": [
+  "ES2002a",
+  "ES2002b",
+  "IS1009a",
+  "IS1009b",
+  "TS3003a",
+  "TS3003b"
+ ],
+ "splits": {
+  "ES2002a": "dev",
+  "ES2002b": "dev",
+  "IS1009a": "dev",
+  "IS1009b": "dev",
+  "TS3003a": "blind_test",
+  "TS3003b": "blind_test"
+ },
+ "n_scenes": {
+  "dev": 160,
+  "blind_test": 80
+ },
+ "rt60_dev_median_s": 0.2995595465705465,
+ "n_rt60": 22,
+ "label_availability_dev": {
+  "separation": {
+   "n_sessions": 4,
+   "n_with_labels": 0,
+   "excluded": [
+    "ami-ES2002a",
+    "ami-ES2002b",
+    "ami-IS1009a",
+    "ami-IS1009b"
+   ]
+  },
+  "asr": {
+   "n_sessions": 4,
+   "n_with_labels": 4,
+   "excluded": []
+  },
+  "diarization": {
+   "n_sessions": 4,
+   "n_with_labels": 4,
+   "excluded": []
+  },
+  "localization": {
+   "n_sessions": 4,
+   "n_with_labels": 0,
+   "excluded": [
+    "ami-ES2002a",
+    "ami-ES2002b",
+    "ami-IS1009a",
+    "ami-IS1009b"
+   ]
+  }
+ }
+}

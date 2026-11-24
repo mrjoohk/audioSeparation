@@ -1,0 +1,118 @@
+{
+ "protocol": "v2",
+ "seed": 1,
+ "n_test": 60,
+ "steps": 3000,
+ "means_si_sdri_db": {
+  "room_A": {
+   "baseline_roomA": 2.687685920322356,
+   "robust": 4.389603861353436
+  },
+  "room_B": {
+   "baseline_roomA": 2.1042045277705195,
+   "robust": 3.0336987435472738
+  },
+  "ctrl_circular4": {
+   "baseline_roomA": 2.8879962256777882,
+   "robust": 3.9085558716534563
+  },
+  "circular3_r3": {
+   "baseline_roomA": 2.8216487321796246,
+   "robust": 4.285866142617517
+  },
+  "linear3_4cm": {
+   "baseline_roomA": 3.2586342463440254,
+   "robust": 4.892674119244238
+  },
+  "square4_8cm": {
+   "baseline_roomA": 3.5005989572423455,
+   "robust": 5.062220768551608
+  }
+ },
+ "paired_robust_vs_baseline": {
+  "room_A": {
+   "n": 60,
+   "mean_diff": 1.7019179410310799,
+   "ci95": [
+    1.2651655523602885,
+    2.154800771097731
+   ]
+  },
+  "room_B": {
+   "n": 60,
+   "mean_diff": 0.9294942157767547,
+   "ci95": [
+    -0.16805723505684061,
+    2.01759206455014
+   ]
+  },
+  "ctrl_circular4": {
+   "n": 60,
+   "mean_diff": 1.020559645975668,
+   "ci95": [
+    0.5399957281728822,
+    1.4875601360051036
+   ]
+  },
+  "circular3_r3": {
+   "n": 60,
+   "mean_diff": 1.4642174104378929,
+   "ci95": [
+    0.9172577342622678,
+    2.0456938659180626
+   ]
+  },
+  "linear3_4cm": {
+   "n": 60,
+   "mean_diff": 1.6340398729002137,
+   "ci95": [
+    1.0997150188185827,
+    2.2059175945428953
+   ]
+  },
+  "square4_8cm": {
+   "n": 60,
+   "mean_diff": 1.5616218113092628,
+   "ci95": [
+    1.145113903391797,
+    2.0233841676524964
+   ]
+  }
+ },
+ "room_B_gain_db": 0.9294942157767543,
+ "req303_gain_ge_1_5db": false,
+ "held_out_arrays": {
+  "circular3_r3": {
+   "baseline_drop_db": 0.0663474934981636,
+   "robust_drop_db": -0.377310270964061,
+   "halved": true,
+   "roomA_ref": {
+    "baseline_drop_db": -0.13396281185726844,
+    "robust_drop_db": 0.10373771873591853,
+    "halved": false
+   }
+  },
+  "linear3_4cm": {
+   "baseline_drop_db": -0.3706380206662372,
+   "robust_drop_db": -0.9841182475907817,
+   "halved": true,
+   "roomA_ref": {
+    "baseline_drop_db": -0.5709483260216692,
+    "robust_drop_db": -0.5030702578908022,
+    "halved": true
+   }
+  },
+  "square4_8cm": {
+   "baseline_drop_db": -0.6126027315645572,
+   "robust_drop_db": -1.1536648968981518,
+   "halved": true,
+   "roomA_ref": {
+    "baseline_drop_db": -0.8129130369199893,
+    "robust_drop_db": -0.6726169071981722,
+    "halved": true
+   }
+  }
+ },
+ "req303_all_arrays_halved": true,
+ "note": "synthetic stand-in assets; not real speech"
+}

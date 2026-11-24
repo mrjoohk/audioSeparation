@@ -33,7 +33,7 @@ class SceneBundle:
     receiver_ids: List[str]
     mixture: np.ndarray            # float32 [C, T]
     references: np.ndarray         # float32 [S, C, T]
-    noise: np.ndarray              # float32 [C, T]
+    noise: Optional[np.ndarray]    # float32 [C, T]; None for storage_profile "training"
     manifest: dict = field(repr=False)
 
     @property
@@ -102,9 +102,13 @@ def load_scene(
         else:
             refs[src_ids.index(entry["source_id"]), c] = data
 
-    for name, arr in (("mixture", mixture), ("noise", noise), ("references", refs)):
+    noise_expected = manifest["render"].get("storage_profile", "full") == "full"
+    checks = [("mixture", mixture), ("references", refs)] + ([("noise", noise)] if noise_expected else [])
+    for name, arr in checks:
         if np.isnan(arr).any():
             raise SceneContractError(f"{mpath}: {name} incomplete or non-finite")
+    if not noise_expected:
+        noise = None
 
     return SceneBundle(
         scene_id=manifest["scene_id"], fs=fs, source_ids=src_ids, receiver_ids=rec_ids,

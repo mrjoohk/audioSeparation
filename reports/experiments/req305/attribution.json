@@ -1,0 +1,329 @@
+{
+  "criterion": {
+    "threshold_pp": -3.0,
+    "ci_upper_below": 0.0,
+    "min_sessions": 20,
+    "baseline": "base",
+    "candidate": "cal"
+  },
+  "sets": {
+    "AMI dev v1": {
+      "n_scenes": 160,
+      "n_sessions": 4,
+      "wer_field": "wer",
+      "mean_wer": {
+        "base": 0.9457534407681111,
+        "cal": 0.8181664654064388,
+        "robust": 0.8520459967710199,
+        "unprocessed": 0.45539619455186753
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": -9.37074439970912,
+          "ci95_pp": [
+            -22.460572296569925,
+            1.3544319942174212
+          ]
+        },
+        "calibration": {
+          "delta_pp": -3.3879531364581097,
+          "ci95_pp": [
+            -10.132333044997141,
+            3.787600704749214
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": -12.758697536167228,
+          "ci95_pp": [
+            -25.28440695076759,
+            -2.2222501700376247
+          ]
+        }
+      },
+      "real_world": true,
+      "unseen": false,
+      "verdict": "충족 (세션 4 < 20: 보류)"
+    },
+    "AMI blind_test v1": {
+      "n_scenes": 80,
+      "n_sessions": 2,
+      "wer_field": "wer",
+      "mean_wer": {
+        "base": 1.0481280727199667,
+        "cal": 1.0676931699616683,
+        "unprocessed": 0.5108060099782412
+      },
+      "factors": {
+        "total (cal vs base)": {
+          "delta_pp": 1.9565097241701679,
+          "ci95_pp": [
+            -18.590974519477708,
+            22.836744207231014
+          ]
+        }
+      },
+      "real_world": true,
+      "unseen": true,
+      "verdict": "미충족 (세션 2 < 20: 보류)"
+    },
+    "AMI dev v2": {
+      "n_scenes": 160,
+      "n_sessions": 4,
+      "wer_field": "wer",
+      "mean_wer": {
+        "base": 0.8728556305019689,
+        "cal": 0.8560288410066541,
+        "robust": 0.8602674461093134,
+        "unprocessed": 0.45539619455186753
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": -1.2588184392655464,
+          "ci95_pp": [
+            -9.32209414322507,
+            7.808732995639542
+          ]
+        },
+        "calibration": {
+          "delta_pp": -0.42386051026593724,
+          "ci95_pp": [
+            -12.71555982744532,
+            12.339723602271317
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": -1.6826789495314833,
+          "ci95_pp": [
+            -12.21202818719336,
+            10.716216719472467
+          ]
+        }
+      },
+      "real_world": true,
+      "unseen": false,
+      "verdict": "미충족 (세션 4 < 20: 보류)"
+    },
+    "LibriSpeech test v1 (simulated rooms)": {
+      "n_scenes": 60,
+      "n_sessions": 1,
+      "wer_field": "wer",
+      "mean_wer": {
+        "base": 0.7562204738107479,
+        "cal": 0.9766489396637683,
+        "robust": 0.9363972180794493,
+        "unprocessed": 0.6019068187754796
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": 18.017674426870148,
+          "ci95_pp": [
+            4.5659134813495355,
+            36.00458728088352
+          ]
+        },
+        "calibration": {
+          "delta_pp": 4.0251721584319,
+          "ci95_pp": [
+            -21.547978076299312,
+            28.648244467840314
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": 22.04284658530204,
+          "ci95_pp": [
+            7.014281058587504,
+            43.27071532242815
+          ]
+        }
+      },
+      "real_world": false,
+      "unseen": true,
+      "verdict": "미충족 (실측 아님: 판정 근거 아님)"
+    },
+    "LibriSpeech test v2 (simulated rooms)": {
+      "n_scenes": 60,
+      "n_sessions": 1,
+      "wer_field": "wer",
+      "mean_wer": {
+        "base": 1.1043561385625784,
+        "cal": 0.940747514343481,
+        "robust": 0.8692465520123162,
+        "unprocessed": 0.6019068187754796
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": -23.510958655026236,
+          "ci95_pp": [
+            -59.48285221928795,
+            3.7667474718881393
+          ]
+        },
+        "calibration": {
+          "delta_pp": 7.150096233116486,
+          "ci95_pp": [
+            -5.117648246343059,
+            23.15944061682978
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": -16.360862421909744,
+          "ci95_pp": [
+            -51.61148865389619,
+            13.116740546815073
+          ]
+        }
+      },
+      "real_world": false,
+      "unseen": true,
+      "verdict": "미충족 (실측 아님: 판정 근거 아님)"
+    },
+    "AMI dev v1, gated": {
+      "n_scenes": 160,
+      "n_sessions": 4,
+      "wer_field": "wer_gated",
+      "mean_wer": {
+        "base": 0.7483268940872387,
+        "cal": 0.6591698957763693,
+        "robust": 0.6723105982347979,
+        "unprocessed": 0.44560285676220623
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": -7.601629585244093,
+          "ci95_pp": [
+            -13.964579613131828,
+            -2.576961397090294
+          ]
+        },
+        "calibration": {
+          "delta_pp": -1.3140702458428515,
+          "ci95_pp": [
+            -4.422857742319217,
+            1.983642489448173
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": -8.915699831086943,
+          "ci95_pp": [
+            -14.952263950500218,
+            -3.809288436434105
+          ]
+        }
+      },
+      "real_world": true,
+      "unseen": false,
+      "verdict": "충족 (세션 4 < 20: 보류)"
+    },
+    "AMI dev v2, gated": {
+      "n_scenes": 160,
+      "n_sessions": 4,
+      "wer_field": "wer_gated",
+      "mean_wer": {
+        "base": 0.759560747472538,
+        "cal": 0.6817099672526588,
+        "robust": 0.6759335137287695,
+        "unprocessed": 0.44560285676220623
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": -8.362723374376856,
+          "ci95_pp": [
+            -11.688769728050856,
+            -4.762049994701028
+          ]
+        },
+        "calibration": {
+          "delta_pp": 0.5776453523889347,
+          "ci95_pp": [
+            -3.472833618256211,
+            5.33260851906951
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": -7.785078021987919,
+          "ci95_pp": [
+            -12.263121107389155,
+            -2.587277660955346
+          ]
+        }
+      },
+      "real_world": true,
+      "unseen": false,
+      "verdict": "충족 (세션 4 < 20: 보류)"
+    },
+    "LibriSpeech test v1, gated": {
+      "n_scenes": 60,
+      "n_sessions": 1,
+      "wer_field": "wer_gated",
+      "mean_wer": {
+        "base": 0.6642363416326005,
+        "cal": 0.7667445424674958,
+        "robust": 0.6961902611695793,
+        "unprocessed": 0.45513162497702997
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": 3.1953919536978757,
+          "ci95_pp": [
+            -1.97490727524757,
+            8.435445833732235
+          ]
+        },
+        "calibration": {
+          "delta_pp": 7.0554281297916495,
+          "ci95_pp": [
+            0.24224037615570473,
+            15.012091090876563
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": 10.250820083489524,
+          "ci95_pp": [
+            4.168549590705965,
+            17.41666056071318
+          ]
+        }
+      },
+      "real_world": false,
+      "unseen": true,
+      "verdict": "미충족 (실측 아님: 판정 근거 아님)"
+    },
+    "LibriSpeech test v2, gated": {
+      "n_scenes": 60,
+      "n_sessions": 1,
+      "wer_field": "wer_gated",
+      "mean_wer": {
+        "base": 0.7692799534369646,
+        "cal": 0.7653865078635929,
+        "robust": 0.7359815747443061,
+        "unprocessed": 0.45513162497702997
+      },
+      "factors": {
+        "augmentation": {
+          "delta_pp": -3.3298378692658437,
+          "ci95_pp": [
+            -11.785777344242483,
+            4.581151596274565
+          ]
+        },
+        "calibration": {
+          "delta_pp": 2.940493311928671,
+          "ci95_pp": [
+            -1.6292986463806958,
+            7.611243685120316
+          ]
+        },
+        "total (cal vs base)": {
+          "delta_pp": -0.3893445573371725,
+          "ci95_pp": [
+            -9.50033200642905,
+            7.78508507432445
+          ]
+        }
+      },
+      "real_world": false,
+      "unseen": true,
+      "verdict": "미충족 (실측 아님: 판정 근거 아님)"
+    }
+  }
+}

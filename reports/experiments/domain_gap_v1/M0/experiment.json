@@ -1,0 +1,40 @@
+{
+ "schema_version": "1.0.0",
+ "kind": "train_mask_model",
+ "created_at": "2026-11-21T07:22:25.044196+00:00",
+ "seed": 0,
+ "config": {
+  "context": 2,
+  "ridge": 1.0,
+  "irm_clip": 0.02,
+  "n_freq": 257,
+  "normalize": false,
+  "augment": null,
+  "n_augment": 0
+ },
+ "data": {
+  "name": "gap-src",
+  "version": "1.0.0",
+  "release_manifest_sha256": "3a7bf59f8e42f23aa44e14e592b8f75220f433e409aba31ca3010cf8146c38d6",
+  "split": "train",
+  "n_scenes": 100,
+  "scene_ids_sha256": "15f3accb66f6f4a5d867f8acc341ab329c18f7b8e5961a45acd75db64b571769"
+ },
+ "checkpoint": {
+  "path": "mask_model.npz",
+  "sha256": "19a0ba1fa7f7470e70f89b1bc22766780560ac858902a55f41c3a0f11e673b63",
+  "n_frames": 238652
+ },
+ "metrics": null,
+ "evaluator": null,
+ "code": {
+  "commit": "fd867f9ef6ccf2639679aba72d13ccdcef20f78c",
+  "dirty": true
+ },
+ "environment": {
+  "python": "3.14.8",
+  "numpy": "2.5.5",
+  "scipy": "1.18.1",
+  "platform": "Windows-11-10.0.26300-SP0"
+ }
+}

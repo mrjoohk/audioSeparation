@@ -1,0 +1,996 @@
+{
+ "meta": {},
+ "summary": {
+  "means": {
+   "baseline_roomA": {
+    "si_sdri_db": 1.2581498558949598,
+    "der": 1.1902788419894814
+   },
+   "robust": {
+    "si_sdri_db": 3.2671654317584737,
+    "der": 0.9857621681416203
+   }
+  },
+  "paired": {
+   "robust-vs-baseline_roomA:si_sdri_db": {
+    "n": 60,
+    "mean_diff": 2.0090155758635135,
+    "ci95": [
+     1.0938617062975202,
+     2.9773031835964776
+    ]
+   },
+   "robust-vs-baseline_roomA:der": {
+    "n": 60,
+    "mean_diff": -0.20451667384786112,
+    "ci95": [
+     -0.28241707207080674,
+     -0.12654566519704388
+    ]
+   }
+  },
+  "n_scenes": 60
+ },
+ "rows": [
+  {
+   "scene_id": "test_000000",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.8962350809189235,
+   "der": 0.7384937238493724
+  },
+  {
+   "scene_id": "test_000000",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.0049931043840201195,
+   "der": 0.4790794979079498
+  },
+  {
+   "scene_id": "test_000001",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.5418031078781216,
+   "der": 0.9265658747300216
+  },
+  {
+   "scene_id": "test_000001",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -1.5958538028924607,
+   "der": 0.9330453563714903
+  },
+  {
+   "scene_id": "test_000002",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.6459550401993406,
+   "der": 0.8482142857142857
+  },
+  {
+   "scene_id": "test_000002",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.264195146428472,
+   "der": 1.0017857142857143
+  },
+  {
+   "scene_id": "test_000003",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.05032069764586278,
+   "der": 1.4470284237726099
+  },
+  {
+   "scene_id": "test_000003",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.3253905603780798,
+   "der": 1.302325581395349
+  },
+  {
+   "scene_id": "test_000004",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.8278771912513885,
+   "der": 1.1305361305361306
+  },
+  {
+   "scene_id": "test_000004",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.8019167438959076,
+   "der": 0.993006993006993
+  },
+  {
+   "scene_id": "test_000005",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.6913734430772212,
+   "der": 1.0146699266503667
+  },
+  {
+   "scene_id": "test_000005",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.032956338210683,
+   "der": 1.2885085574572128
+  },
+  {
+   "scene_id": "test_000006",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.3090341123400262,
+   "der": 1.3662650602409638
+  },
+  {
+   "scene_id": "test_000006",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.642770946236165,
+   "der": 1.1301204819277109
+  },
+  {
+   "scene_id": "test_000007",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.291505312580465,
+   "der": 1.2725366876310273
+  },
+  {
+   "scene_id": "test_000007",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.704672604853705,
+   "der": 0.8658280922431866
+  },
+  {
+   "scene_id": "test_000008",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.3779540172385847,
+   "der": 0.9775784753363229
+  },
+  {
+   "scene_id": "test_000008",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.6331277186454272,
+   "der": 0.7174887892376681
+  },
+  {
+   "scene_id": "test_000009",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.618094841902889,
+   "der": 0.8291571753986332
+  },
+  {
+   "scene_id": "test_000009",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.418737984668128,
+   "der": 0.6560364464692483
+  },
+  {
+   "scene_id": "test_000010",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.7201527375558299,
+   "der": 1.216572504708098
+  },
+  {
+   "scene_id": "test_000010",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 7.242207064439359,
+   "der": 0.832391713747646
+  },
+  {
+   "scene_id": "test_000011",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.2023906933892263,
+   "der": 1.0430528375733856
+  },
+  {
+   "scene_id": "test_000011",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.135099791018636,
+   "der": 0.8610567514677103
+  },
+  {
+   "scene_id": "test_000012",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.1562169795841415,
+   "der": 1.5054945054945055
+  },
+  {
+   "scene_id": "test_000012",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.5626912789886256,
+   "der": 0.9428571428571428
+  },
+  {
+   "scene_id": "test_000013",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.8997796788855754,
+   "der": 1.680473372781065
+  },
+  {
+   "scene_id": "test_000013",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 8.62052318187223,
+   "der": 0.9191321499013807
+  },
+  {
+   "scene_id": "test_000014",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.1419478988335467,
+   "der": 1.8709677419354838
+  },
+  {
+   "scene_id": "test_000014",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.755371328225996,
+   "der": 1.6370967741935485
+  },
+  {
+   "scene_id": "test_000015",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -2.6866764930397578,
+   "der": 2.0869565217391304
+  },
+  {
+   "scene_id": "test_000015",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -3.6775789579565097,
+   "der": 1.5754475703324808
+  },
+  {
+   "scene_id": "test_000016",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.7363635601271241,
+   "der": 1.0947630922693268
+  },
+  {
+   "scene_id": "test_000016",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.2680172217670238,
+   "der": 1.0673316708229426
+  },
+  {
+   "scene_id": "test_000017",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.5495174019118907,
+   "der": 1.040084388185654
+  },
+  {
+   "scene_id": "test_000017",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 10.832381182345092,
+   "der": 1.358649789029536
+  },
+  {
+   "scene_id": "test_000018",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.2599488399220564,
+   "der": 1.3323529411764705
+  },
+  {
+   "scene_id": "test_000018",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.589864440055488,
+   "der": 1.1676470588235295
+  },
+  {
+   "scene_id": "test_000019",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.7081267047750739,
+   "der": 1.0669642857142858
+  },
+  {
+   "scene_id": "test_000019",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.492671813128464,
+   "der": 1.03125
+  },
+  {
+   "scene_id": "test_000020",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.2577456350441282,
+   "der": 1.165644171779141
+  },
+  {
+   "scene_id": "test_000020",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.23738070157670865,
+   "der": 0.8752556237218814
+  },
+  {
+   "scene_id": "test_000021",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.8404749332070192,
+   "der": 1.3316062176165804
+  },
+  {
+   "scene_id": "test_000021",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.541576798558813,
+   "der": 1.9481865284974094
+  },
+  {
+   "scene_id": "test_000022",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.056619311757089,
+   "der": 0.8391038696537678
+  },
+  {
+   "scene_id": "test_000022",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.2620127507926298,
+   "der": 0.7433808553971487
+  },
+  {
+   "scene_id": "test_000023",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.5491262329998063,
+   "der": 1.2236024844720497
+  },
+  {
+   "scene_id": "test_000023",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.0660967942215303,
+   "der": 0.8964803312629399
+  },
+  {
+   "scene_id": "test_000024",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.11368763710383023,
+   "der": 1.5742574257425743
+  },
+  {
+   "scene_id": "test_000024",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 6.846407492364952,
+   "der": 0.8158415841584158
+  },
+  {
+   "scene_id": "test_000025",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.0056957175698995055,
+   "der": 1.4702258726899384
+  },
+  {
+   "scene_id": "test_000025",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.48120373745623,
+   "der": 0.8850102669404517
+  },
+  {
+   "scene_id": "test_000026",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.668053169668154,
+   "der": 1.2995495495495495
+  },
+  {
+   "scene_id": "test_000026",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.762330402188727,
+   "der": 1.2792792792792793
+  },
+  {
+   "scene_id": "test_000027",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.5076330834460374,
+   "der": 0.6542239685658153
+  },
+  {
+   "scene_id": "test_000027",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.590843773777015,
+   "der": 0.6011787819253438
+  },
+  {
+   "scene_id": "test_000028",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.1924775691971297,
+   "der": 0.5444444444444444
+  },
+  {
+   "scene_id": "test_000028",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.3477558382903436,
+   "der": 0.6833333333333333
+  },
+  {
+   "scene_id": "test_000029",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.409022270521362,
+   "der": 0.9548254620123203
+  },
+  {
+   "scene_id": "test_000029",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.2965223813770197,
+   "der": 0.9897330595482546
+  },
+  {
+   "scene_id": "test_000030",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.1967317128896093,
+   "der": 1.2634854771784232
+  },
+  {
+   "scene_id": "test_000030",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.669983134963089,
+   "der": 1.2406639004149378
+  },
+  {
+   "scene_id": "test_000031",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.822431495221204,
+   "der": 1.1956043956043956
+  },
+  {
+   "scene_id": "test_000031",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.2710067998261003,
+   "der": 0.9692307692307692
+  },
+  {
+   "scene_id": "test_000032",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.6922065880328169,
+   "der": 1.5432098765432098
+  },
+  {
+   "scene_id": "test_000032",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.844861179652787,
+   "der": 0.9938271604938271
+  },
+  {
+   "scene_id": "test_000033",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.005232750721816171,
+   "der": 1.3694690265486726
+  },
+  {
+   "scene_id": "test_000033",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.9936487847870716,
+   "der": 1.1261061946902655
+  },
+  {
+   "scene_id": "test_000034",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.2820757660650335,
+   "der": 0.7125256673511293
+  },
+  {
+   "scene_id": "test_000034",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.098277843733323,
+   "der": 0.5297741273100616
+  },
+  {
+   "scene_id": "test_000035",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.139393535806018,
+   "der": 0.8234165067178503
+  },
+  {
+   "scene_id": "test_000035",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.284427335133239,
+   "der": 0.43570057581573896
+  },
+  {
+   "scene_id": "test_000036",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.5522136361504804,
+   "der": 1.6743119266055047
+  },
+  {
+   "scene_id": "test_000036",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 8.368360622196725,
+   "der": 1.1422018348623852
+  },
+  {
+   "scene_id": "test_000037",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 6.861963987057154,
+   "der": 0.9904580152671756
+  },
+  {
+   "scene_id": "test_000037",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.605981135280346,
+   "der": 1.001908396946565
+  },
+  {
+   "scene_id": "test_000038",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.24586378702709522,
+   "der": 1.7251732101616628
+  },
+  {
+   "scene_id": "test_000038",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 6.229988510903063,
+   "der": 0.8637413394919169
+  },
+  {
+   "scene_id": "test_000039",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.7960229578992334,
+   "der": 2.2809278350515463
+  },
+  {
+   "scene_id": "test_000039",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.4243020029212654,
+   "der": 1.4845360824742269
+  },
+  {
+   "scene_id": "test_000040",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.8896519620960117,
+   "der": 1.1073825503355705
+  },
+  {
+   "scene_id": "test_000040",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.1997761456058207,
+   "der": 1.0022371364653244
+  },
+  {
+   "scene_id": "test_000041",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.9043298223450775,
+   "der": 1.0329218106995885
+  },
+  {
+   "scene_id": "test_000041",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -2.4446356086365353,
+   "der": 0.9156378600823045
+  },
+  {
+   "scene_id": "test_000042",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.9109455826822344,
+   "der": 0.7215189873417721
+  },
+  {
+   "scene_id": "test_000042",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -2.0183124380384623,
+   "der": 0.6455696202531646
+  },
+  {
+   "scene_id": "test_000043",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.123927769179167,
+   "der": 1.3722466960352422
+  },
+  {
+   "scene_id": "test_000043",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 6.294014096477721,
+   "der": 1.092511013215859
+  },
+  {
+   "scene_id": "test_000044",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.0036545930110794,
+   "der": 0.5919661733615222
+  },
+  {
+   "scene_id": "test_000044",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.703527992435989,
+   "der": 0.5687103594080338
+  },
+  {
+   "scene_id": "test_000045",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -1.4793798940190923,
+   "der": 2.065610859728507
+  },
+  {
+   "scene_id": "test_000045",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.0824594209749407,
+   "der": 1.2171945701357465
+  },
+  {
+   "scene_id": "test_000046",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.5279027065222528,
+   "der": 1.429245283018868
+  },
+  {
+   "scene_id": "test_000046",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -2.3033292974862842,
+   "der": 0.8726415094339622
+  },
+  {
+   "scene_id": "test_000047",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.1514849303296515,
+   "der": 1.0798004987531171
+  },
+  {
+   "scene_id": "test_000047",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.5312215876448416,
+   "der": 1.2693266832917707
+  },
+  {
+   "scene_id": "test_000048",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 4.136000490463031,
+   "der": 1.1657608695652173
+  },
+  {
+   "scene_id": "test_000048",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.9738386109901188,
+   "der": 1.1548913043478262
+  },
+  {
+   "scene_id": "test_000049",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.215395100532362,
+   "der": 1.0727272727272728
+  },
+  {
+   "scene_id": "test_000049",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.219323440136696,
+   "der": 1.3386363636363636
+  },
+  {
+   "scene_id": "test_000050",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.5332200970259953,
+   "der": 0.6632860040567952
+  },
+  {
+   "scene_id": "test_000050",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 8.460412485652704,
+   "der": 0.5618661257606491
+  },
+  {
+   "scene_id": "test_000051",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.618090011014349,
+   "der": 2.1482558139534884
+  },
+  {
+   "scene_id": "test_000051",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 1.7661696230985262,
+   "der": 1.691860465116279
+  },
+  {
+   "scene_id": "test_000052",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.513454973130715,
+   "der": 0.7064777327935222
+  },
+  {
+   "scene_id": "test_000052",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 7.908655973742965,
+   "der": 0.6842105263157895
+  },
+  {
+   "scene_id": "test_000053",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.22390329327342817,
+   "der": 1.4812967581047383
+  },
+  {
+   "scene_id": "test_000053",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.9507268678003407,
+   "der": 1.114713216957606
+  },
+  {
+   "scene_id": "test_000054",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 2.730622733656462,
+   "der": 0.8099547511312217
+  },
+  {
+   "scene_id": "test_000054",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 17.41804142562501,
+   "der": 0.7963800904977375
+  },
+  {
+   "scene_id": "test_000055",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -1.1758305092661425,
+   "der": 0.9119266055045872
+  },
+  {
+   "scene_id": "test_000055",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.28387586271056675,
+   "der": 0.8825688073394495
+  },
+  {
+   "scene_id": "test_000056",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 3.32881033852592,
+   "der": 1.5876288659793814
+  },
+  {
+   "scene_id": "test_000056",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 9.76219548947614,
+   "der": 0.9360824742268041
+  },
+  {
+   "scene_id": "test_000057",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.40687991819109326,
+   "der": 0.945679012345679
+  },
+  {
+   "scene_id": "test_000057",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 0.3255618612515895,
+   "der": 0.945679012345679
+  },
+  {
+   "scene_id": "test_000058",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.88413306412582,
+   "der": 0.6997690531177829
+  },
+  {
+   "scene_id": "test_000058",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": 5.152578849105132,
+   "der": 0.4780600461893764
+  },
+  {
+   "scene_id": "test_000059",
+   "system": "baseline_roomA",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -0.5749829028251425,
+   "der": 0.6984815618221258
+  },
+  {
+   "scene_id": "test_000059",
+   "system": "robust",
+   "n_speakers": 2,
+   "n_mics": 3,
+   "si_sdri_db": -1.7811598959622876,
+   "der": 0.7114967462039046
+  }
+ ]
+}
